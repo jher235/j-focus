@@ -6,8 +6,11 @@ import java.nio.file.Paths;
 
 public class PathResolver {
 
-    private static final String[] ROOT_MARKERS = {".git", "settings.gradle", "settings.gradle.kts"};
-    private static final String[] BUILD_MARKERS = {"build.gradle", "build.gradle.kts", "pom.xml"};
+    private static final String[] MARKERS = {
+        ".git",
+        "settings.gradle", "settings.gradle.kts", // multi module root
+        "build.gradle", "build.gradle.kts", "pom.xml" // single module root
+    };
 
 
     public Path findProjectRoot() {
@@ -15,33 +18,20 @@ public class PathResolver {
     }
 
     Path findProjectRoot(Path startPath) {
+        Path path = startPath;
 
-        Path result = walkUpAndFind(startPath, ROOT_MARKERS);
-        if (result != null) {
-            return result;
-        }
-
-        result = walkUpAndFind(startPath, BUILD_MARKERS);
-        if (result != null) {
-            return result;
-        }
-
-        System.err.println(
-            "Warning: Could not find project root. Using current directory as fallback.");
-        return startPath;
-    }
-
-    private Path walkUpAndFind(Path start, String[] markers) {
-        Path path = start;
         while (path != null) {
-            for (String marker : markers) {
+            for (String marker : MARKERS) {
                 if (Files.exists(path.resolve(marker))) {
                     return path;
                 }
             }
             path = path.getParent();
         }
-        return null;
+
+        System.err.println(
+            "Warning: Could not find project root. Using current directory as fallback.");
+        return startPath;
     }
 
     public Path findSourceRoot(Path projectRoot) {
