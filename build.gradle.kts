@@ -43,6 +43,12 @@ tasks.jar {
     }
 }
 
+tasks.shadowJar {
+    manifest {
+        attributes["Main-Class"] = "com.jher235.jfocus.JFocusCli"
+    }
+}
+
 
 tasks.test {
     useJUnitPlatform()
