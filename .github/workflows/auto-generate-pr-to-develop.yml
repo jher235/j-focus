@@ -48,7 +48,7 @@ jobs:
           COMMITS=$(git log origin/develop...HEAD --pretty=format:"- %s")
           
           echo "diff<<EOF" >> $GITHUB_ENV
-          echo "${DIFF:0:5000}" 
+          echo "${DIFF:0:5000}" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
           
           echo "commits<<EOF" >> $GITHUB_ENV
