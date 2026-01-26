@@ -1,7 +1,7 @@
 package com.jher235.jfocus.core;
 
+import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParserConfiguration;
-import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
@@ -16,6 +16,8 @@ import java.util.stream.Stream;
 public class ProjectParser {
 
     private final Path sourceRoot;
+    private final JavaParser javaParser;
+
 
     public ProjectParser() {
         PathResolver pathResolver = new PathResolver();
@@ -25,17 +27,20 @@ public class ProjectParser {
         System.out.println("Project Root: " + projectRoot);
         System.out.println("Source Root: " + this.sourceRoot);
 
-        configureParser();
+        this.javaParser = createConfiguredParser();
     }
 
-    private void configureParser() {
+    private JavaParser createConfiguredParser() {
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
         typeSolver.add(new ReflectionTypeSolver());
         typeSolver.add(new JavaParserTypeSolver(sourceRoot));
+
         JavaSymbolSolver symbolSolver = new JavaSymbolSolver(typeSolver);
 
-        ParserConfiguration config = StaticJavaParser.getConfiguration();
+        ParserConfiguration config = new ParserConfiguration();
         config.setSymbolResolver(symbolSolver);
+
+        return new JavaParser(config);
     }
 
     /**
@@ -50,9 +55,8 @@ public class ProjectParser {
                     .filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().equals(targetName))
                     .findFirst();
-
                 if (targetFile.isPresent()) {
-                    return Optional.of(StaticJavaParser.parse(targetFile.get()));
+                    return javaParser.parse(targetFile.get()).getResult();
                 }
             }
         } catch (IOException e) {
