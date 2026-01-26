@@ -14,10 +14,13 @@ public class PathResolver {
 
 
     public Path findProjectRoot() {
-        return findProjectRoot(Paths.get(System.getProperty("user.dir")).toAbsolutePath());
+        return findProjectRoot(
+            Paths.get(System.getProperty("user.dir")).toAbsolutePath(),
+            null
+        );
     }
 
-    Path findProjectRoot(Path startPath) {
+    Path findProjectRoot(Path startPath, Path ceiling) {
         Path path = startPath;
 
         while (path != null) {
@@ -25,6 +28,10 @@ public class PathResolver {
                 if (Files.exists(path.resolve(marker))) {
                     return path;
                 }
+            }
+
+            if (path.equals(ceiling)) {
+                break;
             }
             path = path.getParent();
         }
