@@ -2,7 +2,6 @@ name: auto-generate-pr-to-develop.yml
 
 on:
   push:
-    # main과 develop 브랜치를 제외한 모든 브랜치에 push될 때 실행
     branches-ignore:
       - main
       - develop
@@ -26,12 +25,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         run: |
-          
-          # 현재 브랜치에서 develop으로 가는 PR이 이미 있는지 확인
           EXISTING_PR=$(gh pr list --head ${{ github.ref_name }} --base develop --json number --jq '.[0].number')
           if [ -n "$EXISTING_PR" ]; then
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "PR already exists: #$EXISTING_PR"
           else
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
@@ -40,20 +36,13 @@ jobs:
         if: steps.check_pr.outputs.exists == 'false'
         id: get-context
         run: |
-          
-          # develop 브랜치와의 차이점(Diff)과 커밋 메시지 추출
-          # origin/develop이 없는 경우를 대비해 fetch 실행
           git fetch origin develop
           DIFF=$(git diff origin/develop...HEAD)
           COMMITS=$(git log origin/develop...HEAD --pretty=format:"- %s")
           
-          echo "diff<<EOF" >> $GITHUB_ENV
-          echo "${DIFF:0:5000}" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-          
-          echo "commits<<EOF" >> $GITHUB_ENV
-          echo "$COMMITS" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          # 파일로 저장하여 환경 변수 크기 제한 및 특수문자 문제 방지
+          echo "$DIFF" > diff_context.txt
+          echo "$COMMITS" > commits_context.txt
 
       - name: Generate PR Content with Gemini
         if: steps.check_pr.outputs.exists == 'false'
@@ -62,23 +51,23 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const fs = require('fs');
+            const diff = fs.readFileSync('diff_context.txt', 'utf8').substring(0, 5000);
+            const commits = fs.readFileSync('commits_context.txt', 'utf8');
+
             const prompt = `
               You are an expert software engineer. Based on the commit messages and code diff below, 
               write a PR title and body in professional English.
 
               Structure the body exactly as follows:
               ## 📝 Description
-              (A concise summary of what this PR is about)
-
-              ## ❓ Why is this change required?
-              (Motivation behind this change)
-
+              ...
               ## ✨ What does this PR do?
-              (Key technical changes in bullet points)
+              ...
 
               Context:
-              - Commits: ${process.env.commits}
-              - Diff: ${process.env.diff}
+              - Commits: ${commits}
+              - Diff: ${diff}
 
               Response Format:
               TITLE: [The PR Title]
@@ -100,7 +89,6 @@ jobs:
             const result = await response.json();
             const aiResponse = result.candidates[0].content.parts[0].text;
             
-            // 제목과 본문 파싱
             const titleMatch = aiResponse.match(/TITLE: (.*)/);
             const bodyMatch = aiResponse.split('BODY:')[1];
             
@@ -108,7 +96,7 @@ jobs:
             const body = bodyMatch ? bodyMatch.trim() : "No description generated.";
             
             core.setOutput('title', title);
-            core.setOutput('body', body);
+            fs.writeFileSync('pr_body.md', body);
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
@@ -121,5 +109,5 @@ jobs:
             --base develop \
             --head ${{ github.ref_name }} \
             --title "${{ steps.gemini.outputs.title }}" \
-            --body "${{ steps.gemini.outputs.body }}" \
+            --body-file pr_body.md \
             --assignee ${{ github.actor }}
