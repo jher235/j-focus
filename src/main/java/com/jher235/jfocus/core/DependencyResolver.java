@@ -2,11 +2,14 @@ package com.jher235.jfocus.core;
 
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.expr.FieldAccessExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.NameExpr;
+import com.github.javaparser.resolution.Resolvable;
 import com.github.javaparser.resolution.UnsolvedSymbolException;
 import com.github.javaparser.resolution.declarations.ResolvedFieldDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
+import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
 import java.util.ArrayList;
@@ -59,28 +62,43 @@ public class DependencyResolver {
     /**
      * Finds ALL fields used by the target method that belong to the project source code.
      * This handles inherited fields and fields from other classes if accessed directly.
+     * NameExpr(Variable Name) + FieldAccessExpr(this.-)
      */
     public List<FieldDeclaration> resolveFields(MethodDeclaration targetMethod) {
         List<FieldDeclaration> dependencies = new ArrayList<>();
 
-        List<NameExpr> usedNames = targetMethod.findAll(NameExpr.class);
+        // NameExpr
+        targetMethod.findAll(NameExpr.class).forEach(expr ->
+            resolveAndAddField(expr, dependencies));
 
-        for (NameExpr nameExpr : usedNames) {
-            try {
-                if (nameExpr.resolve() instanceof ResolvedFieldDeclaration resolvedField) {
-                    if (resolvedField instanceof JavaParserFieldDeclaration) {
-                        FieldDeclaration fieldNode = ((JavaParserFieldDeclaration) resolvedField).getWrappedNode();
-
-                        if (!dependencies.contains(fieldNode)) {
-                            dependencies.add(fieldNode);
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                // Ignore local variables or unresolvable names
-            }
-        }
+        // FieldAccessExpr
+        targetMethod.findAll(FieldAccessExpr.class).forEach(expr ->
+            resolveAndAddField(expr, dependencies));
 
         return dependencies;
+    }
+
+    /**
+     * Helper method that resolves an expression and adds it to the list if it is a field in our source code
+     */
+    private void resolveAndAddField(Resolvable<? extends ResolvedValueDeclaration> expr, List<FieldDeclaration> dependencies) {
+        try {
+            ResolvedValueDeclaration resolved = expr.resolve();
+
+            if (resolved instanceof ResolvedFieldDeclaration resolvedField) {
+                // client's source code
+                if (resolvedField instanceof JavaParserFieldDeclaration) {
+                    FieldDeclaration fieldNode = ((JavaParserFieldDeclaration) resolvedField).getWrappedNode();
+
+                    if (!dependencies.contains(fieldNode)) {
+                        dependencies.add(fieldNode);
+                    }
+                }
+            }
+        } catch (UnsolvedSymbolException e) {
+            // pass
+        } catch (RuntimeException e) {
+            System.err.println("Warning: Failed to resolve field expression '" + expr + "': " + e.getMessage());
+        }
     }
 }
