@@ -10,6 +10,7 @@ import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeS
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -44,26 +45,43 @@ public class ProjectParser {
     }
 
     /**
-     * return parsing AST(CompilationUnit) for file name (or path)
+     * Return parsing AST(CompilationUnit) for file name (or path).
+     * When file duplicated, return error and induce specify path.
      */
     public Optional<CompilationUnit> parseFile(String fileName) {
         String targetName = fileName.endsWith(".java") ? fileName : fileName + ".java";
 
         try {
+            Path directPath = sourceRoot.resolve(targetName);
+            if (Files.isRegularFile(directPath)) {
+                return javaParser.parse(directPath).getResult();
+            }
+
             try (Stream<Path> paths = Files.walk(sourceRoot)) {
-                Optional<Path> targetFile = paths
+                List<Path> matches = paths
                     .filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().equals(targetName))
-                    .findFirst();
-                if (targetFile.isPresent()) {
-                    return javaParser.parse(targetFile.get()).getResult();
+                    .limit(2)
+                    .toList();
+
+                if (matches.size() == 1) {
+                    return javaParser.parse(matches.get(0)).getResult();
+                }
+
+                if (matches.size() > 1) {
+                    System.err.println(
+                            "Error: Ambiguous file name. Multiple files found for '" + targetName + "':");
+                    matches.forEach(p -> System.err.println("   - " + sourceRoot.relativize(p)));
+                    System.err.println(
+                        "Please specify the relative path (e.g., 'core/" + targetName + "')");
+                    return Optional.empty();
                 }
             }
         } catch (IOException e) {
-            System.err.println("Warning: error while file searching " + e.getMessage());
+            System.err.println("Warning: error while searching file: " + e.getMessage());
         }
 
-        System.err.println("Warning: cannot find file " + targetName);
+        System.err.println("Warning: cannot find file '" + targetName + "'");
         return Optional.empty();
     }
 }
