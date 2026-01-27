@@ -57,6 +57,12 @@ public class ProjectParser {
                 return javaParser.parse(directPath).getResult();
             }
 
+            Path requestedPath = Path.of(targetName);
+            if (requestedPath.getNameCount() > 1 || requestedPath.isAbsolute()) {
+                System.err.println("Error: Cannot find file at path '" + targetName + "'");
+                return Optional.empty();
+            }
+
             try (Stream<Path> paths = Files.walk(sourceRoot)) {
                 List<Path> matches = paths
                     .filter(Files::isRegularFile)
