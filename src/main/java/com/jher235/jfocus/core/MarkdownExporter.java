@@ -10,6 +10,18 @@ import com.jher235.jfocus.model.ContextResult;
  */
 public class MarkdownExporter {
 
+    // control external method body visibility
+    private final boolean verbose;
+
+    // default (signature only)
+    public MarkdownExporter() {
+        this(false);
+    }
+
+    public MarkdownExporter(boolean verbose) {
+        this.verbose = verbose;
+    }
+
     /**
      * NOTE: Currently, external methods exclude bodies to save tokens. We are
      * evaluating whether to provide full bodies for project-internal dependencies
@@ -31,29 +43,26 @@ public class MarkdownExporter {
         }
 
         if (!result.getExternalMethods().isEmpty()) {
-            /**
-             * I'm considering what is better way to include the external method body or just java doc and signature..
-             * I think there's a way to manage it as an option and think about it more...
-             * include external method's body in Source Code
-             */
-//            sb.append("\n## External Context (Other Classes)\n");
-//            sb.append("Methods called by the target, defined in other classes (source code only).\n\n");
-//            for (MethodDeclaration method : result.getExternalMethods()) {
-//                appendCodeBlock(sb, method.toString());
-//            }
 
-            /**
-             * JavaDoc & Signature only
-             */
-            sb.append("\n## External Context (Other Classes)\n");
-            sb.append("Methods called by the target, defined in other classes.\n");
-            sb.append("Signatures and JavaDocs are provided to maintain focus.\n\n");
-            for (MethodDeclaration method : result.getExternalMethods()) {
-                method.getJavadoc().ifPresent(javadoc ->
-                    sb.append(javadoc.toText()).append("\n"));
+            if(this.verbose){
+                // Full Body
+                sb.append("\n## External Context (Other Classes)\n");
+                sb.append("Methods called by the target, defined in other classes (source code only).\n\n");
+                for (MethodDeclaration method : result.getExternalMethods()) {
+                    appendCodeBlock(sb, method.toString());
+                }
+            } else {
+                // JavaDoc & Signature only
+                sb.append("\n## External Context (Other Classes)\n");
+                sb.append("Methods called by the target, defined in other classes.\n");
+                sb.append("Signatures and JavaDocs are provided to maintain focus.\n\n");
+                for (MethodDeclaration method : result.getExternalMethods()) {
+                    method.getJavadoc().ifPresent(javadoc ->
+                        sb.append(javadoc.toText()).append("\n"));
 
-                String signature = method.getDeclarationAsString(true, true, true) + ";";
-                appendCodeBlock(sb, signature);
+                    String signature = method.getDeclarationAsString(true, true, true) + ";";
+                    appendCodeBlock(sb, signature);
+                }
             }
         }
 
