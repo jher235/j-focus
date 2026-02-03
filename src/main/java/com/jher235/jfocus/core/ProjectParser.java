@@ -61,10 +61,11 @@ public class ProjectParser {
                 Path projectRelative = projectRoot.resolve(targetName);
                 if (Files.isRegularFile(projectRelative)){
                     result = javaParser.parse(projectRelative).getResult();
-                }
-                Path directPath = sourceRoot.resolve(targetName);
-                if (Files.isRegularFile(directPath)) {
-                    result = javaParser.parse(directPath).getResult();
+                } else {
+                    Path directPath = sourceRoot.resolve(targetName);
+                    if (Files.isRegularFile(directPath)) {
+                        result = javaParser.parse(directPath).getResult();
+                    }
                 }
             }
 
