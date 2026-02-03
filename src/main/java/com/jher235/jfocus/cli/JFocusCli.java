@@ -83,9 +83,11 @@ public class JFocusCli implements Callable<Integer> {
                     return 1;
                 }
                 if (methods.size() > 1) {
-                    System.err.println("Warning: Multiple methods found. Using the first one.");
+                    System.err.println("Multiple overloads found. Please choose: ");
+                    targetMethod = selectMethodInteractive(methods);
+                } else {
+                    targetMethod = methods.get(0);
                 }
-                targetMethod = methods.get(0);
             }
 
             if (targetMethod == null) return 1;
@@ -148,6 +150,31 @@ public class JFocusCli implements Callable<Integer> {
                 if (index >= 0 && index < allMethods.size()) {
                     return allMethods.get(index);
                 }
+                System.err.println("Invalid number. Please try again.");
+            } catch (NumberFormatException e) {
+                System.err.println("Please enter a number.");
+            }
+        }
+    }
+
+    private MethodDeclaration selectMethodInteractive(List<MethodDeclaration> methods) {
+        if (methods.isEmpty()) {
+            System.err.println("No methods found in this file.");
+            return null;
+        }
+        System.err.println("\nAvailable Methods:");
+        for (int i = 0; i < methods.size(); i++) {
+            MethodDeclaration m = methods.get(i);
+            String params = m.getParameters().toString().replace("[", "(").replace("]", ")");
+            System.err.printf(" [%d] %s%s\n", i + 1, m.getNameAsString(), params);
+        }
+        while (true) {
+            System.err.print("\nSelect method number (or 'q' to quit): ");
+            String input = scanner.nextLine().trim();
+            if (input.equalsIgnoreCase("q")) return null;
+            try {
+                int index = Integer.parseInt(input) - 1;
+                if (index >= 0 && index < methods.size()) return methods.get(index);
                 System.err.println("Invalid number. Please try again.");
             } catch (NumberFormatException e) {
                 System.err.println("Please enter a number.");
