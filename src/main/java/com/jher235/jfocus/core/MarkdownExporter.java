@@ -10,18 +10,27 @@ import com.jher235.jfocus.model.ContextResult;
  */
 public class MarkdownExporter {
 
-    /**
-     * NOTE: Currently, external methods exclude bodies to save tokens. We are
-     * evaluating whether to provide full bodies for project-internal dependencies
-     * in future iterations.
-     */
+    private final ExportConfig config;
+
+    // Default constructor (uses default config)
+    public MarkdownExporter() {
+        this(ExportConfig.defaultConfig());
+    }
+
+    // Constructor with configuration object
+    public MarkdownExporter(ExportConfig config) {
+        this.config = config;
+    }
+
     public String export(ContextResult result) {
         StringBuilder sb = new StringBuilder();
 
+        // 1. Header & Target Method
         sb.append("# Target Method\n");
         sb.append("The main logic to analyze.\n\n");
         appendCodeBlock(sb, result.getTargetMethod().toString());
 
+        // 2. Internal Context (Same Class)
         if (!result.getInternalMethods().isEmpty()) {
             sb.append("\n## Internal Context (Same Class)\n");
             sb.append("Methods called by the target, defined within the same class.\n\n");
@@ -30,33 +39,13 @@ public class MarkdownExporter {
             }
         }
 
+        // 3. External Context (Other Classes)
+        // Logic extracted to a helper method to keep the main flow clean.
         if (!result.getExternalMethods().isEmpty()) {
-            /**
-             * I'm considering what is better way to include the external method body or just java doc and signature..
-             * I think there's a way to manage it as an option and think about it more...
-             * include external method's body in Source Code
-             */
-//            sb.append("\n## External Context (Other Classes)\n");
-//            sb.append("Methods called by the target, defined in other classes (source code only).\n\n");
-//            for (MethodDeclaration method : result.getExternalMethods()) {
-//                appendCodeBlock(sb, method.toString());
-//            }
-
-            /**
-             * JavaDoc & Signature only
-             */
-            sb.append("\n## External Context (Other Classes)\n");
-            sb.append("Methods called by the target, defined in other classes.\n");
-            sb.append("Signatures and JavaDocs are provided to maintain focus.\n\n");
-            for (MethodDeclaration method : result.getExternalMethods()) {
-                method.getJavadoc().ifPresent(javadoc ->
-                    sb.append(javadoc.toText()).append("\n"));
-
-                String signature = method.getDeclarationAsString(true, true, true) + ";";
-                appendCodeBlock(sb, signature);
-            }
+            appendExternalContext(sb, result);
         }
 
+        // 4. Related Fields
         if (!result.getUsedFields().isEmpty()) {
             sb.append("\n## Related Fields\n");
             sb.append("Class fields accessed by the target method.\n\n");
@@ -68,9 +57,51 @@ public class MarkdownExporter {
         return sb.toString();
     }
 
+    /**
+     * Appends external context information based on the configuration.
+     * - Verbose: Includes full source code.
+     * - Default: Includes only Signature and JavaDoc.
+     */
+    private void appendExternalContext(StringBuilder sb, ContextResult result) {
+        sb.append("\n## External Context (Other Classes)\n");
+
+        if (config.verbose()) {
+            sb.append("Methods called by the target, defined in other classes.\n");
+            sb.append("Full source code provided (--verbose).\n\n");
+
+            for (MethodDeclaration method : result.getExternalMethods()) {
+                appendCodeBlock(sb, method.toString());
+            }
+        } else {
+            sb.append("Methods called by the target, defined in other classes.\n");
+            sb.append("Signatures and JavaDocs are provided to maintain focus.\n\n");
+
+            for (MethodDeclaration method : result.getExternalMethods()) {
+                // Include JavaDoc if present (toText() strips tags, toString() keeps them)
+                method.getJavadoc().ifPresent(javadoc ->
+                    sb.append(javadoc.toString()).append("\n"));
+
+                // Include Signature only
+                String signature = method.getDeclarationAsString(true, true, true) + ";";
+                appendCodeBlock(sb, signature);
+            }
+        }
+    }
+
     private void appendCodeBlock(StringBuilder sb, String code) {
         sb.append("```java\n");
         sb.append(code).append("\n");
         sb.append("```\n\n");
+    }
+
+    /**
+     * Configuration record for export options.
+     * This avoids the "Boolean Trap" in constructors and allows for easy expansion
+     * (e.g., maxDepth, includeFields, formatType) without breaking existing code.
+     */
+    public record ExportConfig(boolean verbose) {
+        public static ExportConfig defaultConfig() {
+            return new ExportConfig(false);
+        }
     }
 }
