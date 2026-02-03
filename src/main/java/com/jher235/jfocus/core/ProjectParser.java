@@ -53,6 +53,8 @@ public class ProjectParser {
             : fileName;
         String targetName = rawName + ".java";
         Path targetPath = Paths.get(targetName);
+        String baseName = targetPath.getFileName().toString();
+        String searchNameLower = baseName.substring(0, baseName.length() - 5).toLowerCase();
 
         try {
             Optional<CompilationUnit> result = Optional.empty();
@@ -79,13 +81,15 @@ public class ProjectParser {
                         .filter(Files::isRegularFile)
                         .filter(p -> {
                             String fName = p.getFileName().toString();
+                            String fNameLower = fName.toLowerCase();
+                            if (!fNameLower.endsWith(".java")) return false;
 
                             // A. Exact match (case-insensitive)
                             if (fName.equalsIgnoreCase(targetName)) return true;
 
                             // B. Partial match (case-insensitive, comparing without extension)
-                            String nameWithoutExt = fName.replace(".java", "");
-                            return nameWithoutExt.toLowerCase().contains(rawName.toLowerCase());
+                            String nameWithoutExt = fName.substring(0, fName.length() - 5);
+                            return nameWithoutExt.toLowerCase().contains(searchNameLower);
                         })
                         // Sort by length (shorter is likely more accurate) then alphabetically
                         .sorted((p1, p2) -> {
