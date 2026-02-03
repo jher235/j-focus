@@ -19,12 +19,13 @@ import java.util.stream.Stream;
 public class ProjectParser {
 
     private final Path sourceRoot;
+    private final Path projectRoot;
     private final JavaSymbolSolver symbolSolver;
     private final JavaParser javaParser;
 
     public ProjectParser() {
         PathResolver pathResolver = new PathResolver();
-        Path projectRoot = pathResolver.findProjectRoot();
+        this.projectRoot = pathResolver.findProjectRoot();
         this.sourceRoot = pathResolver.findSourceRoot(projectRoot);
 
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
@@ -57,6 +58,10 @@ public class ProjectParser {
             if (Files.isRegularFile(targetPath)) {
                 result = javaParser.parse(targetPath).getResult();
             } else {
+                Path projectRelative = projectRoot.resolve(targetName);
+                if (Files.isRegularFile(projectRelative)){
+                    result = javaParser.parse(projectRelative).getResult();
+                }
                 Path directPath = sourceRoot.resolve(targetName);
                 if (Files.isRegularFile(directPath)) {
                     result = javaParser.parse(directPath).getResult();
