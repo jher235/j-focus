@@ -97,6 +97,7 @@ public class ProjectParser {
 
         } catch (IOException e) {
             System.err.println("Warning: Error while searching file: " + e.getMessage());
+            return Optional.empty();
         }
 
         System.err.println("Error: Cannot find file '" + targetName + "'");
