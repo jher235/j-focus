@@ -46,10 +46,14 @@ public class JFocusCli implements Callable<Integer> {
     public Integer call() {
         try {
             // 1. Handle File Input (Interactive)
-            if (fileName == null) {
+
+            while (fileName == null || fileName.isEmpty()) {
                 // Use System.err for prompts to avoid polluting stdout during piping
                 System.err.print("Enter file name to search: ");
                 fileName = scanner.nextLine().trim();
+                if (fileName.isEmpty()) {
+                    System.err.println("File name cannot be empty.");
+                }
             }
 
             System.err.println("Searching for: " + fileName + "...");
