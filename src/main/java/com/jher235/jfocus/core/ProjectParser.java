@@ -42,19 +42,22 @@ public class ProjectParser {
 
     /**
      * Parses a Java file into a CompilationUnit.
-     * Supports both direct file paths and fuzzy search by filename.
+     * Supports direct paths, case-insensitive search, and partial matching.
      *
-     * @param fileName The name or path of the file to parse (e.g., "OrderService" or "src/main/java/.../OrderService.java").
+     * @param fileName The name or path of the file to parse (e.g., "OrderService", "order", or "src/.../OrderService.java").
      * @return An Optional containing the parsed CompilationUnit if successful, or empty if not found.
      */
     public Optional<CompilationUnit> parseFile(String fileName) {
-        String targetName = fileName.endsWith(".java") ? fileName : fileName + ".java";
+        String rawName = fileName.endsWith(".java")
+            ? fileName.substring(0, fileName.length() - 5)
+            : fileName;
+        String targetName = rawName + ".java";
         Path targetPath = Paths.get(targetName);
 
         try {
             Optional<CompilationUnit> result = Optional.empty();
 
-            // 1. Try resolving as a direct path or relative to source root
+            // 1. Try resolving as a direct path or relative path
             if (Files.isRegularFile(targetPath)) {
                 result = javaParser.parse(targetPath).getResult();
             } else {
@@ -69,26 +72,42 @@ public class ProjectParser {
                 }
             }
 
-            // 2. Fuzzy search: if only a filename is provided, search recursively in sourceRoot
-            if (result.isEmpty() && targetPath.getNameCount() == 1) {
+            // 2. Fuzzy search: if not found by direct path, search recursively in sourceRoot
+            if (result.isEmpty()) {
                 try (Stream<Path> paths = Files.walk(sourceRoot)) {
                     List<Path> matches = paths
                         .filter(Files::isRegularFile)
-                        .filter(p -> p.getFileName().toString().equals(targetName))
-                        .limit(2)
+                        .filter(p -> {
+                            String fName = p.getFileName().toString();
+
+                            // A. Exact match (case-insensitive)
+                            if (fName.equalsIgnoreCase(targetName)) return true;
+
+                            // B. Partial match (case-insensitive, comparing without extension)
+                            String nameWithoutExt = fName.replace(".java", "");
+                            return nameWithoutExt.toLowerCase().contains(rawName.toLowerCase());
+                        })
+                        // Sort by length (shorter is likely more accurate) then alphabetically
+                        .sorted((p1, p2) -> {
+                            int len1 = p1.getFileName().toString().length();
+                            int len2 = p2.getFileName().toString().length();
+                            if (len1 != len2) return Integer.compare(len1, len2);
+                            return p1.compareTo(p2);
+                        })
+                        .limit(5)
                         .toList();
 
                     if (matches.size() == 1) {
+                        System.out.println("Found file: " + matches.get(0).getFileName());
                         result = javaParser.parse(matches.get(0)).getResult();
                     } else if (matches.size() > 1) {
-                        System.err.println("Error: Ambiguous file name. Multiple files found for '" + targetName + "':");
+                        System.err.println("Error: Ambiguous file name. Found " + matches.size() + " matches for '" + rawName + "':");
                         matches.forEach(p -> System.err.println("   - " + sourceRoot.relativize(p)));
                         return Optional.empty();
                     }
                 }
             }
 
-            // Inject SymbolSolver manually to ensure symbols are resolvable in subsequent steps
             if (result.isPresent()) {
                 CompilationUnit cu = result.get();
                 cu.setData(Node.SYMBOL_RESOLVER_KEY, this.symbolSolver);
@@ -100,7 +119,7 @@ public class ProjectParser {
             return Optional.empty();
         }
 
-        System.err.println("Error: Cannot find file '" + targetName + "'");
+        System.err.println("Error: Cannot find file matching '" + fileName + "'");
         return Optional.empty();
     }
 }
