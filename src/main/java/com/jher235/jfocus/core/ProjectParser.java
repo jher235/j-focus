@@ -34,7 +34,7 @@ public class ProjectParser {
         typeSolver.add(new ReflectionTypeSolver());
 
         // Add JavaParserTypeSolver only if the source root exists
-        if (Files.exists(sourceRoot)) {
+        if (Files.isDirectory(sourceRoot)) {
             typeSolver.add(new JavaParserTypeSolver(sourceRoot));
         }
 

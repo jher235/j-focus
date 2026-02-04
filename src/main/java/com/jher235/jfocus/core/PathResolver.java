@@ -63,7 +63,7 @@ public class PathResolver {
     public Path findSourceRoot(Path projectRoot) {
         // Standard structure for Maven/Gradle
         Path standardSrc = projectRoot.resolve("src/main/java");
-        if (Files.exists(standardSrc)) {
+        if (Files.isDirectory(standardSrc)) {
             return standardSrc;
         }
 
