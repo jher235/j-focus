@@ -10,7 +10,7 @@ REPO="jher235/j-focus"
 VERSION="1.0.0" # Update this version when releasing a new one
 JAR_NAME="j-focus-${VERSION}-all.jar"
 INSTALL_DIR="$HOME/.jfocus"
-DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/$JAR_NAME"
+DOWNLOAD_URL="https://github.com/$REPO/releases/download/v$VERSION/$JAR_NAME"
 
 echo "🚀 Starting J-Focus installation..."
 

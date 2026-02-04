@@ -10,7 +10,7 @@ $Repo = "jher235/j-focus"
 $Version = "1.0.0" # Update this version when releasing a new one
 $JarName = "j-focus-$Version-all.jar"
 $InstallDir = "$HOME\.jfocus"
-$DownloadUrl = "https://github.com/$Repo/releases/latest/download/$JarName"
+$DownloadUrl = "https://github.com/$Repo/releases/download/v$Version/$JarName"
 $DestPath = "$InstallDir\j-focus.jar"
 $BatPath = "$InstallDir\jfocus.bat"
 
