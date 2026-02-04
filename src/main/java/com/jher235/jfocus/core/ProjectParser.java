@@ -54,7 +54,11 @@ public class ProjectParser {
      * @return An Optional containing the parsed CompilationUnit if successful, or empty if not found.
      */
     public Optional<CompilationUnit> parseFile(String fileName) {
-        // Normalize input: remove extension if present for easier matching
+        // 1. Preserve original input path for direct checks (Essential for case-sensitive OS like Linux)
+        Path directInput = Paths.get(fileName);
+
+        // 2. Normalize input: remove extension if present for easier matching
+        // This handles cases where user types "OrderService" or "orderservice"
         String rawName = fileName.toLowerCase().endsWith(".java")
             ? fileName.substring(0, fileName.length() - 5)
             : fileName;
@@ -68,8 +72,13 @@ public class ProjectParser {
         try {
             Optional<CompilationUnit> result = Optional.empty();
 
-            // 1. Direct File Resolution: Check if the input is a valid direct path
-            if (Files.isRegularFile(targetPath)) {
+            // 1. Direct File Resolution
+            // Priority A: Check the exact path provided by the user (Case-Sensitive check)
+            if (Files.isRegularFile(directInput)) {
+                result = javaParser.parse(directInput).getResult();
+            }
+            // Priority B: Check the normalized path (Case-Insensitive check)
+            else if (Files.isRegularFile(targetPath)) {
                 result = javaParser.parse(targetPath).getResult();
             } else {
                 // Check relative to project root
@@ -114,7 +123,7 @@ public class ProjectParser {
                         .toList();
 
                     if (matches.size() == 1) {
-                        System.out.println("ℹ️ Found file: " + matches.get(0).getFileName());
+                        System.out.println("Found file: " + matches.get(0).getFileName());
                         result = javaParser.parse(matches.get(0)).getResult();
                     } else if (matches.size() > 1) {
                         System.err.println("Error: Ambiguous file name. Found " + matches.size() + " matches for '" + rawName + "':");
