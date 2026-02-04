@@ -121,8 +121,14 @@ public class ProjectParser {
                         })
                         .limit(5)
                         .toList();
+                    Optional<Path> exactMatch = matches.stream()
+                        .filter(p -> p.getFileName().toString().equalsIgnoreCase(targetName))
+                        .findFirst();
 
-                    if (matches.size() == 1) {
+                    if (exactMatch.isPresent()) {
+                        System.out.println("Found exact match: " + exactMatch.get().getFileName());
+                        result = javaParser.parse(exactMatch.get()).getResult();
+                    }else if (matches.size() == 1) {
                         System.out.println("Found file: " + matches.get(0).getFileName());
                         result = javaParser.parse(matches.get(0)).getResult();
                     } else if (matches.size() > 1) {
