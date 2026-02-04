@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.jher235"
-version = "1.0-SNAPSHOT"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
@@ -39,13 +39,13 @@ dependencies {
 
 tasks.jar {
     manifest {
-        attributes["Main-Class"] = "com.jher235.jfocus.JFocusCli"
+        attributes["Main-Class"] = "com.jher235.jfocus.cli.JFocusCli"
     }
 }
 
 tasks.shadowJar {
     manifest {
-        attributes["Main-Class"] = "com.jher235.jfocus.JFocusCli"
+        attributes["Main-Class"] = "com.jher235.jfocus.cli.JFocusCli"
     }
 }
 
