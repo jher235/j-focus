@@ -55,7 +55,7 @@ public class ProjectParser {
      */
     public Optional<CompilationUnit> parseFile(String fileName) {
         // Normalize input: remove extension if present for easier matching
-        String rawName = fileName.endsWith(".java")
+        String rawName = fileName.toLowerCase().endsWith(".java")
             ? fileName.substring(0, fileName.length() - 5)
             : fileName;
         String targetName = rawName + ".java";
