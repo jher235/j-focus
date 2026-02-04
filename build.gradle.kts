@@ -39,13 +39,13 @@ dependencies {
 
 tasks.jar {
     manifest {
-        attributes["Main-Class"] = "com.jher235.jfocus.JFocusCli"
+        attributes["Main-Class"] = "com.jher235.jfocus.cli.JFocusCli"
     }
 }
 
 tasks.shadowJar {
     manifest {
-        attributes["Main-Class"] = "com.jher235.jfocus.JFocusCli"
+        attributes["Main-Class"] = "com.jher235.jfocus.cli.JFocusCli"
     }
 }
 
