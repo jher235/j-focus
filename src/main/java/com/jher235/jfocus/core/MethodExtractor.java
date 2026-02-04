@@ -8,20 +8,24 @@ import java.util.Optional;
 public class MethodExtractor {
 
     /**
-     * AST looks for all methods with a specific name (overloading correspondence)
-     * @param cu parsed AST (CompilationUnit)
-     * @param methodName Method name to find
-     * @return Found method list (blank list if not)
+     * Finds all methods matching the specified name (case-insensitive).
+     *
+     * @param cu The parsed CompilationUnit.
+     * @param methodName The name of the method to find.
+     * @return A list of matching MethodDeclarations.
      */
     public List<MethodDeclaration> extractMethods(CompilationUnit cu, String methodName) {
         return cu.findAll(MethodDeclaration.class).stream()
-            .filter(method -> method.getNameAsString().equals(methodName))
+            .filter(method -> method.getNameAsString().equalsIgnoreCase(methodName))
             .toList();
     }
 
     /**
-     * (for CLI output) Extracts the source code of the methods found into a string.
-     * If there are multiple methods, combine them separated by lines.
+     * Extracts the source code of the found methods into a single string.
+     *
+     * @param cu The parsed CompilationUnit.
+     * @param methodName The name of the method to extract.
+     * @return An Optional containing the combined source code of the methods.
      */
     public Optional<String> extractMethodSource(CompilationUnit cu, String methodName) {
         List<MethodDeclaration> methods = extractMethods(cu, methodName);
