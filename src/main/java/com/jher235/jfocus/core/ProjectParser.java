@@ -25,12 +25,18 @@ public class ProjectParser {
 
     public ProjectParser() {
         PathResolver pathResolver = new PathResolver();
+
+        // Automatically find the project root based on the current execution directory
         this.projectRoot = pathResolver.findProjectRoot();
         this.sourceRoot = pathResolver.findSourceRoot(projectRoot);
 
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
         typeSolver.add(new ReflectionTypeSolver());
-        typeSolver.add(new JavaParserTypeSolver(sourceRoot));
+
+        // Add JavaParserTypeSolver only if the source root exists
+        if (Files.exists(sourceRoot)) {
+            typeSolver.add(new JavaParserTypeSolver(sourceRoot));
+        }
 
         this.symbolSolver = new JavaSymbolSolver(typeSolver);
 
@@ -48,25 +54,30 @@ public class ProjectParser {
      * @return An Optional containing the parsed CompilationUnit if successful, or empty if not found.
      */
     public Optional<CompilationUnit> parseFile(String fileName) {
+        // Normalize input: remove extension if present for easier matching
         String rawName = fileName.endsWith(".java")
             ? fileName.substring(0, fileName.length() - 5)
             : fileName;
         String targetName = rawName + ".java";
         Path targetPath = Paths.get(targetName);
+
+        // Prepare search term for partial matching (lowercase)
         String baseName = targetPath.getFileName().toString();
-        String searchNameLower = baseName.substring(0, baseName.length() - 5).toLowerCase();
+        String searchNameLower = baseName.toLowerCase().replace(".java", "");
 
         try {
             Optional<CompilationUnit> result = Optional.empty();
 
-            // 1. Try resolving as a direct path or relative path
+            // 1. Direct File Resolution: Check if the input is a valid direct path
             if (Files.isRegularFile(targetPath)) {
                 result = javaParser.parse(targetPath).getResult();
             } else {
+                // Check relative to project root
                 Path projectRelative = projectRoot.resolve(targetName);
                 if (Files.isRegularFile(projectRelative)){
                     result = javaParser.parse(projectRelative).getResult();
                 } else {
+                    // Check relative to source root
                     Path directPath = sourceRoot.resolve(targetName);
                     if (Files.isRegularFile(directPath)) {
                         result = javaParser.parse(directPath).getResult();
@@ -74,24 +85,25 @@ public class ProjectParser {
                 }
             }
 
-            // 2. Fuzzy search: if not found by direct path, search recursively in sourceRoot
+            // 2. Fuzzy Search: If not found, search recursively in sourceRoot
             if (result.isEmpty()) {
                 try (Stream<Path> paths = Files.walk(sourceRoot)) {
                     List<Path> matches = paths
                         .filter(Files::isRegularFile)
                         .filter(p -> {
                             String fName = p.getFileName().toString();
-                            String fNameLower = fName.toLowerCase();
-                            if (!fNameLower.endsWith(".java")) return false;
 
-                            // A. Exact match (case-insensitive)
+                            // Only consider .java files
+                            if (!fName.toLowerCase().endsWith(".java")) return false;
+
+                            // A. Exact match (Case-Insensitive)
                             if (fName.equalsIgnoreCase(targetName)) return true;
 
-                            // B. Partial match (case-insensitive, comparing without extension)
+                            // B. Partial match (Case-Insensitive, ignore extension)
                             String nameWithoutExt = fName.substring(0, fName.length() - 5);
                             return nameWithoutExt.toLowerCase().contains(searchNameLower);
                         })
-                        // Sort by length (shorter is likely more accurate) then alphabetically
+                        // Sort logic: Shorter names first (exact match preference), then alphabetical
                         .sorted((p1, p2) -> {
                             int len1 = p1.getFileName().toString().length();
                             int len2 = p2.getFileName().toString().length();
@@ -102,7 +114,7 @@ public class ProjectParser {
                         .toList();
 
                     if (matches.size() == 1) {
-                        System.out.println("Found file: " + matches.get(0).getFileName());
+                        System.out.println("ℹ️ Found file: " + matches.get(0).getFileName());
                         result = javaParser.parse(matches.get(0)).getResult();
                     } else if (matches.size() > 1) {
                         System.err.println("Error: Ambiguous file name. Found " + matches.size() + " matches for '" + rawName + "':");
