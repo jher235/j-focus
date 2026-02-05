@@ -26,12 +26,14 @@ import java.util.Scanner;
 public class ProjectParser {
 
     private final Path projectRoot;
+    private final Scanner scanner;
     private Path sourceRoot; // Mutable: can be updated based on package structure
     private JavaSymbolSolver symbolSolver;
     private JavaParser javaParser;
 
     public ProjectParser() {
         this.projectRoot = Paths.get(".").toAbsolutePath().normalize();
+        this.scanner = new Scanner(System.in);
 
         // Initial guess: Prioritize src/main/java
         Path standardSourceRoot = projectRoot.resolve("src/main/java");
@@ -149,7 +151,7 @@ public class ProjectParser {
             }
 
             // Re-initialize solver only if the root has changed
-            if (calculatedRoot != null && !calculatedRoot.equals(this.sourceRoot)) {
+            if (calculatedRoot != null && !isSamePath(calculatedRoot, this.sourceRoot)) {
                 System.err.println("Detected dynamic Source Root: " + calculatedRoot);
                 this.sourceRoot = calculatedRoot;
                 initializeParser(this.sourceRoot);
@@ -157,6 +159,16 @@ public class ProjectParser {
 
         } catch (Exception e) {
             // Fallback to existing configuration on error
+        }
+    }
+
+    private boolean isSamePath(Path p1, Path p2) {
+        try {
+            if (p1 == null || p2 == null) return false;
+            return Files.isSameFile(p1, p2);
+        } catch (IOException e) {
+            // Fallback to normalized absolute path comparison
+            return p1.toAbsolutePath().normalize().equals(p2.toAbsolutePath().normalize());
         }
     }
 
@@ -270,12 +282,14 @@ public class ProjectParser {
         System.out.print("Select (1-" + matches.size() + "): ");
 
         try {
-            Scanner scanner = new Scanner(System.in);
             if (scanner.hasNextInt()) {
                 int selection = scanner.nextInt();
                 if (selection >= 1 && selection <= matches.size()) {
                     return Optional.of(matches.get(selection - 1));
                 }
+            } else {
+                // Consume invalid input to prevent infinite loops if called in loop
+                scanner.next();
             }
         } catch (Exception e) {
             // Ignore input errors
