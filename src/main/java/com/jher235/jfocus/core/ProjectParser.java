@@ -10,10 +10,12 @@ import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeS
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
+import java.util.Scanner;
 import java.util.stream.Stream;
 
 public class ProjectParser {
@@ -26,14 +28,14 @@ public class ProjectParser {
     public ProjectParser() {
         PathResolver pathResolver = new PathResolver();
 
-        // Automatically find the project root based on the current execution directory
+        // Resolve project structure based on execution context
         this.projectRoot = pathResolver.findProjectRoot();
         this.sourceRoot = pathResolver.findSourceRoot(projectRoot);
 
+        // Configure TypeSolver (Reflection + Source Code)
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
         typeSolver.add(new ReflectionTypeSolver());
 
-        // Add JavaParserTypeSolver only if the source root exists
         if (Files.isDirectory(sourceRoot)) {
             typeSolver.add(new JavaParserTypeSolver(sourceRoot));
         }
@@ -42,109 +44,253 @@ public class ProjectParser {
 
         ParserConfiguration config = new ParserConfiguration();
         config.setSymbolResolver(symbolSolver);
-
         this.javaParser = new JavaParser(config);
     }
 
     /**
      * Parses a Java file into a CompilationUnit.
-     * Supports direct paths, case-insensitive search, and partial matching.
+     * Strategies:
+     * 1. Direct path resolution (Absolute/Relative).
+     * 2. Fuzzy search in source root (Case-insensitive, Partial match).
      *
-     * @param fileName The name or path of the file to parse (e.g., "OrderService", "order", or "src/.../OrderService.java").
-     * @return An Optional containing the parsed CompilationUnit if successful, or empty if not found.
+     * @param fileName The file path or name (e.g., "OrderService", "src/.../Order.java").
+     * @return Optional containing the parsed unit, or empty if not found/ambiguous.
      */
     public Optional<CompilationUnit> parseFile(String fileName) {
-        // 1. Preserve original input path for direct checks (Essential for case-sensitive OS like Linux)
-        Path directInput = Paths.get(fileName);
-
-        // 2. Normalize input: remove extension if present for easier matching
-        // This handles cases where user types "OrderService" or "orderservice"
-        String rawName = fileName.toLowerCase().endsWith(".java")
-            ? fileName.substring(0, fileName.length() - 5)
-            : fileName;
-        String targetName = rawName + ".java";
-        Path targetPath = Paths.get(targetName);
-
-        // Prepare search term for partial matching (lowercase)
-        String baseName = targetPath.getFileName().toString();
-        String searchNameLower = baseName.toLowerCase().replace(".java", "");
+        String targetName = normalizeFileName(fileName);
 
         try {
-            Optional<CompilationUnit> result = Optional.empty();
-
-            // 1. Direct File Resolution
-            // Priority A: Check the exact path provided by the user (Case-Sensitive check)
-            if (Files.isRegularFile(directInput)) {
-                result = javaParser.parse(directInput).getResult();
-            }
-            // Priority B: Check the normalized path (Case-Insensitive check)
-            else if (Files.isRegularFile(targetPath)) {
-                result = javaParser.parse(targetPath).getResult();
-            } else {
-                // Check relative to project root
-                Path projectRelative = projectRoot.resolve(targetName);
-                if (Files.isRegularFile(projectRelative)){
-                    result = javaParser.parse(projectRelative).getResult();
-                } else {
-                    // Check relative to source root
-                    Path directPath = sourceRoot.resolve(targetName);
-                    if (Files.isRegularFile(directPath)) {
-                        result = javaParser.parse(directPath).getResult();
-                    }
-                }
+            // Strategy 1: Attempt direct resolution first
+            Optional<CompilationUnit> directResult = tryParseDirectly(fileName, targetName);
+            if (directResult.isPresent()) {
+                return directResult;
             }
 
-            // 2. Fuzzy Search: If not found, search recursively in sourceRoot
-            if (result.isEmpty()) {
-                try (Stream<Path> paths = Files.walk(sourceRoot)) {
-                    List<Path> matches = paths
-                        .filter(Files::isRegularFile)
-                        .filter(p -> {
-                            String fName = p.getFileName().toString();
+            // Strategy 2: Fuzzy search within the source directory
+            List<Path> candidates = scanForCandidates(targetName);
 
-                            // Only consider .java files
-                            if (!fName.toLowerCase().endsWith(".java")) return false;
-
-                            // A. Exact match (Case-Insensitive)
-                            if (fName.equalsIgnoreCase(targetName)) return true;
-
-                            // B. Partial match (Case-Insensitive, ignore extension)
-                            String nameWithoutExt = fName.substring(0, fName.length() - 5);
-                            return nameWithoutExt.toLowerCase().contains(searchNameLower);
-                        })
-                        // Sort logic: Shorter names first (exact match preference), then alphabetical
-                        .sorted((p1, p2) -> {
-                            int len1 = p1.getFileName().toString().length();
-                            int len2 = p2.getFileName().toString().length();
-                            if (len1 != len2) return Integer.compare(len1, len2);
-                            return p1.compareTo(p2);
-                        })
-                        .limit(5)
-                        .toList();
-
-                    if (matches.size() == 1) {
-                        System.out.println("Found file: " + matches.get(0).getFileName());
-                        result = javaParser.parse(matches.get(0)).getResult();
-                    } else if (matches.size() > 1) {
-                        System.err.println("Error: Ambiguous file name. Found " + matches.size() + " matches for '" + rawName + "':");
-                        matches.forEach(p -> System.err.println("   - " + sourceRoot.relativize(p)));
-                        return Optional.empty();
-                    }
-                }
-            }
-
-            if (result.isPresent()) {
-                CompilationUnit cu = result.get();
-                cu.setData(Node.SYMBOL_RESOLVER_KEY, this.symbolSolver);
-                return Optional.of(cu);
-            }
+            // Handle matches (Exact match vs Ambiguity)
+            return selectBestCandidate(candidates, targetName)
+                .map(this::parsePath)
+                .orElse(Optional.empty());
 
         } catch (IOException e) {
-            System.err.println("Warning: Error while searching file: " + e.getMessage());
+            System.err.println("Warning: File resolution failed - " + e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private String normalizeFileName(String fileName) {
+        if (fileName.toLowerCase().endsWith(".java")) {
+            return fileName.substring(0, fileName.length() - 5) + ".java";
+        }
+        return fileName + ".java";
+    }
+
+    /**
+     * Attempts to resolve the file using direct paths (Absolute, Relative to Project/Source).
+     */
+    private Optional<CompilationUnit> tryParseDirectly(String originalInput, String targetName) throws IOException {
+        Path directInput;
+        Path targetPath;
+
+        try {
+            directInput = Paths.get(originalInput);
+            targetPath = Paths.get(targetName);
+        } catch (InvalidPathException e) {
+            System.err.println("Invalid path syntax: " + e.getInput());
             return Optional.empty();
         }
 
-        System.err.println("Error: Cannot find file matching '" + fileName + "'");
+        // Priority A: Exact user input (Handles Case-Sensitive OS)
+        if (Files.isRegularFile(directInput)) {
+            return parsePath(directInput);
+        }
+
+        // Priority B: Normalized path
+        if (Files.isRegularFile(targetPath)) {
+            return parsePath(targetPath);
+        }
+
+        // Priority C: Relative to Project Root
+        Path projectRelative = projectRoot.resolve(targetName);
+        if (Files.isRegularFile(projectRelative)) {
+            return parsePath(projectRelative);
+        }
+
+        // Priority D: Relative to Source Root
+        Path sourceRelative = sourceRoot.resolve(targetName);
+        if (Files.isRegularFile(sourceRelative)) {
+            return parsePath(sourceRelative);
+        }
+
         return Optional.empty();
+    }
+
+    /**
+     * Scans the source directory recursively for potential matches.
+     * Filters by extension, exact match, and partial match.
+     */
+    private List<Path> scanForCandidates(String targetName) throws IOException {
+        // Extract base filename to support inputs with directory paths (e.g., "api/User" -> "User")
+        String baseName = getBaseName(targetName);
+        String searchTerm = baseName.toLowerCase().replace(".java", "");
+
+        try (Stream<Path> paths = Files.walk(sourceRoot)) {
+            return paths
+                .filter(Files::isRegularFile)
+                .filter(path -> isMatch(path, baseName, searchTerm))
+                .sorted((p1, p2) -> compareRelevance(p1, p2, searchTerm))
+                .limit(10)
+                .toList();
+        }
+    }
+
+    private String getBaseName(String path) {
+        int lastSlash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        if (lastSlash >= 0) {
+            return path.substring(lastSlash + 1);
+        }
+        return path;
+    }
+
+    private boolean isMatch(Path path, String baseName, String searchTerm) {
+        String fileName = path.getFileName().toString();
+        if (!fileName.toLowerCase().endsWith(".java")) {
+            return false;
+        }
+
+        // Check A: Exact match (Case-Insensitive)
+        if (fileName.equalsIgnoreCase(baseName)) {
+            return true;
+        }
+
+        // Check B: Partial match
+        String nameWithoutExt = fileName.substring(0, fileName.length() - 5);
+        return nameWithoutExt.toLowerCase().contains(searchTerm);
+    }
+
+    private int compareRelevance(Path p1, Path p2, String searchTerm) {
+        String n1 = p1.getFileName().toString().toLowerCase().replace(".java", "");
+        String n2 = p2.getFileName().toString().toLowerCase().replace(".java", "");
+
+        // 1. Exact match priority
+        boolean exact1 = n1.equals(searchTerm);
+        boolean exact2 = n2.equals(searchTerm);
+        if (exact1 && !exact2) return -1;
+        if (!exact1 && exact2) return 1;
+
+        // 2. Starts with priority
+        boolean start1 = n1.startsWith(searchTerm);
+        boolean start2 = n2.startsWith(searchTerm);
+        if (start1 && !start2) return -1;
+        if (!start1 && start2) return 1;
+
+        // 3. Length priority (Shortest first)
+        int lenCompare = Integer.compare(n1.length(), n2.length());
+        if (lenCompare != 0) return lenCompare;
+
+        return n1.compareTo(n2);
+    }
+
+    /**
+     * Resolves the best match from the candidate list.
+     * Handles exact match prioritization and ambiguity reporting.
+     */
+    private Optional<Path> selectBestCandidate(List<Path> matches, String targetName) {
+        if (matches.isEmpty()) {
+            System.err.println("Error: No file found matching '" + targetName + "'");
+            return Optional.empty();
+        }
+
+        String baseName = getBaseName(targetName);
+
+        // 1. Check for an exact name match within candidates
+        Optional<Path> exactMatch = matches.stream()
+            .filter(p -> p.getFileName().toString().equalsIgnoreCase(baseName))
+            .findFirst();
+
+        if (exactMatch.isPresent()) {
+            System.out.println("Found exact match: " + exactMatch.get().getFileName());
+            return exactMatch;
+        }
+
+        // 2. Single candidate found
+        if (matches.size() == 1) {
+            System.out.println("Found file: " + matches.get(0).getFileName());
+            return Optional.of(matches.get(0));
+        }
+
+
+        // 3. prevent blocking in non-interactive environments
+        if (System.console() == null) {
+            System.err.println("Ambiguous file name in non-interactive session. Please specify the full path.");
+            return Optional.empty();
+        }
+
+        // 4. Delegate UI interaction (Display list & Get input)
+        return promptUserForSelection(matches, targetName);
+    }
+
+    /**
+     * Displays the list of candidates and handles user input.
+     * Logic for printing the list is moved here for better encapsulation.
+     */
+    private Optional<Path> promptUserForSelection(List<Path> matches, String targetName){
+        System.out.println("Ambiguous file name. Found " + matches.size() + " matches for '" + targetName + "':");
+
+        for (int i = 0; i < matches.size(); i++) {
+            Path path = matches.get(i);
+            String fileName = path.getFileName().toString();
+
+            // Prevent NullPointerException if path has no parent
+            Path parent = path.getParent();
+            String parentPath = (parent != null)
+                ? sourceRoot.relativize(parent).toString().replace("\\", "/")
+                : "";
+
+            System.out.printf("   [%d] %-30s (%s)%n", i + 1, fileName, parentPath);
+        }
+
+        System.out.print("Select a file number (1-" + matches.size() + "): ");
+
+        try {
+            Scanner scanner = new Scanner(System.in);
+            if (scanner.hasNextInt()) {
+                int selection = scanner.nextInt();
+                if (selection >= 1 && selection <= matches.size()) {
+                    Path selectedPath = matches.get(selection - 1);
+                    System.out.println("Selected: " + selectedPath.getFileName());
+                    return Optional.of(selectedPath);
+                } else {
+                    System.err.println("Invalid selection number.");
+                }
+            } else {
+                System.err.println("Invalid input. Please enter a number.");
+            }
+        } catch (Exception e) {
+            System.err.println("Error reading input.");
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<CompilationUnit> parsePath(Path path) {
+        try {
+            CompilationUnit cu = javaParser.parse(path).getResult().orElseThrow();
+            // Inject symbol solver for further analysis
+            cu.setData(Node.SYMBOL_RESOLVER_KEY, this.symbolSolver);
+            return Optional.of(cu);
+        } catch (Exception e) {
+            System.err.println("Failed to parse: " + path);
+            return Optional.empty();
+        }
+    }
+
+    private int prioritizeShortestName(Path p1, Path p2) {
+        int len1 = p1.getFileName().toString().length();
+        int len2 = p2.getFileName().toString().length();
+        if (len1 != len2) return Integer.compare(len1, len2);
+        return p1.compareTo(p2);
     }
 }
