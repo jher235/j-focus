@@ -60,23 +60,37 @@ public class DependencyResolver {
     /**
      * Finds the method declaration by analyzing the AST structure.
      * Traces variable types from Fields, Parameters, and Local Variables.
+     * Handles unscoped calls (implicit this) and explicit scopes (this., super.).
      */
     private Optional<MethodDeclaration> resolveByAstAnalysis(MethodDeclaration contextMethod, MethodCallExpr call) {
-        if (call.getScope().isEmpty()) return Optional.empty();
-
-        String variableName = call.getScope().get().toString(); // e.g., "user", "userInfoFacade"
-        String methodName = call.getNameAsString();             // e.g., "setName", "patchUserInfo"
-
-        // Ignore complex chains or static calls (e.g., repository.findById(...))
-        if (variableName.contains(".") && !variableName.startsWith("this.")) return Optional.empty();
-        if (variableName.contains("(")) return Optional.empty();
+        String methodName = call.getNameAsString(); // e.g., "setName", "patchUserInfo"
 
         // 1. Find the class containing the method
         ClassOrInterfaceDeclaration currentClass = contextMethod.findAncestor(ClassOrInterfaceDeclaration.class).orElse(null);
         if (currentClass == null) return Optional.empty();
 
-        // 2. Resolve Variable Type (Priority: Local Var -> Parameter -> Field)
+        // 2. Handle Unscoped Calls (e.g., internalMethod()) -> Implicit 'this'
+        if (call.getScope().isEmpty()) {
+            return currentClass.getMethodsByName(methodName).stream().findFirst();
+        }
+
+        String variableName = call.getScope().get().toString(); // e.g., "user", "this.repository"
+
+        // 3. Normalize Scope (Handle this.field / super.field)
+        if (variableName.contains(".")) {
+            if (variableName.startsWith("this.") || variableName.startsWith("super.")) {
+                // Strip prefix: "this.repository" -> "repository"
+                variableName = variableName.substring(variableName.indexOf('.') + 1);
+            } else {
+                // Ignore other complex chains (e.g., "repo.find().map()")
+                return Optional.empty();
+            }
+        }
+
+        // 4. Resolve Variable Type
         String typeName = null;
+
+        // Handle exact "this" or "super" (e.g., this.method())
         if ("this".equals(variableName) || "super".equals(variableName)) {
             typeName = currentClass.getNameAsString();
         } else {
@@ -88,27 +102,32 @@ public class DependencyResolver {
 
         if (typeName == null) return Optional.empty();
 
+        // Strip generics (e.g., List<User> -> List)
         if (typeName.contains("<")) {
             typeName = typeName.substring(0, typeName.indexOf("<")).trim();
         }
 
         if (JdkKnownTypes.contains(typeName)) return Optional.empty();
 
-        // 3. Search for the file corresponding to the type name
+        // 5. Search for the file corresponding to the type name
         Optional<CompilationUnit> cuOpt = projectParser.findCompilationUnit(typeName);
 
         if (cuOpt.isPresent()) {
             CompilationUnit cu = cuOpt.get();
             injectSolver(cu);
 
-            // 4. Find the method within the identified file
-            return cu.findAll(ClassOrInterfaceDeclaration.class).stream()
+            Optional<MethodDeclaration> realMethod = cu.findAll(ClassOrInterfaceDeclaration.class).stream()
                 .flatMap(c -> c.getMethodsByName(methodName).stream())
                 .findFirst();
+
+            if (realMethod.isPresent()) return realMethod;
+
+            // Note: Lombok synthetic method generation logic was removed for simplicity.
         }
 
         return Optional.empty();
     }
+
 
     /**
      * Scans for local variable declarations inside the method body.
