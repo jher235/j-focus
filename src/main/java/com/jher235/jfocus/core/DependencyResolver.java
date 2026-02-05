@@ -38,8 +38,9 @@ public class DependencyResolver {
      * @return List of method declarations found in the source code
      */
     public List<MethodDeclaration> resolveMethods(MethodDeclaration targetMethod) {
-        List<MethodDeclaration> dependencies = new ArrayList<>();
+        injectSolver(targetMethod);
 
+        List<MethodDeclaration> dependencies = new ArrayList<>();
         // Collect all method calls
         List<MethodCallExpr> methodCalls = targetMethod.findAll(MethodCallExpr.class);
 
@@ -58,6 +59,7 @@ public class DependencyResolver {
                             cu.setData(Node.SYMBOL_RESOLVER_KEY, this.symbolSolver);
                         }
                     });
+                    injectSolver(targetMethod);
 
                     // Avoid self-recursion and duplicates
                     if (!methodNode.equals(targetMethod) && !dependencies.contains(methodNode)) {
@@ -79,6 +81,8 @@ public class DependencyResolver {
      * NameExpr(Variable Name) + FieldAccessExpr(this.-)
      */
     public List<FieldDeclaration> resolveFields(MethodDeclaration targetMethod) {
+        injectSolver(targetMethod);
+
         List<FieldDeclaration> dependencies = new ArrayList<>();
 
         // NameExpr
@@ -114,5 +118,17 @@ public class DependencyResolver {
         } catch (RuntimeException e) {
             System.err.println("Warning: Failed to resolve field expression '" + expr + "': " + e.getMessage());
         }
+    }
+
+    /**
+     * Helper to inject SymbolSolver into the CompilationUnit of a Node.
+     * This ensures subsequent resolve() calls within that file succeed.
+     */
+    private void injectSolver(Node node) {
+        node.findCompilationUnit().ifPresent(cu -> {
+            if (!cu.containsData(Node.SYMBOL_RESOLVER_KEY)) {
+                cu.setData(Node.SYMBOL_RESOLVER_KEY, this.symbolSolver);
+            }
+        });
     }
 }
