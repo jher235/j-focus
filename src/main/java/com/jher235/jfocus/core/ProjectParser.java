@@ -10,6 +10,7 @@ import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeS
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -90,8 +91,16 @@ public class ProjectParser {
      * Attempts to resolve the file using direct paths (Absolute, Relative to Project/Source).
      */
     private Optional<CompilationUnit> tryParseDirectly(String originalInput, String targetName) throws IOException {
-        Path directInput = Paths.get(originalInput);
-        Path targetPath = Paths.get(targetName);
+        Path directInput;
+        Path targetPath;
+
+        try {
+            directInput = Paths.get(originalInput);
+            targetPath = Paths.get(targetName);
+        } catch (InvalidPathException e) {
+            System.err.println("Invalid path syntax: " + e.getInput());
+            return Optional.empty();
+        }
 
         // Priority A: Exact user input (Handles Case-Sensitive OS)
         if (Files.isRegularFile(directInput)) {
