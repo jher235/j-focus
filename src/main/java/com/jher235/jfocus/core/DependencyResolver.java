@@ -18,8 +18,10 @@ import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public class DependencyResolver {
 
@@ -33,6 +35,9 @@ public class DependencyResolver {
         injectSolver(targetMethod);
 
         List<MethodDeclaration> dependencies = new ArrayList<>();
+        // Track unique method signatures to prevent duplicates from different AST contexts
+        Set<String> seenSignatures = new HashSet<>();
+
         List<MethodCallExpr> methodCalls = targetMethod.findAll(MethodCallExpr.class);
 
         for (MethodCallExpr call : methodCalls) {
@@ -41,13 +46,13 @@ public class DependencyResolver {
                 ResolvedMethodDeclaration resolved = call.resolve();
                 if (resolved instanceof JavaParserMethodDeclaration) {
                     MethodDeclaration methodNode = ((JavaParserMethodDeclaration) resolved).getWrappedNode();
-                    addDependency(dependencies, targetMethod, methodNode);
+                    addDependency(dependencies, seenSignatures, targetMethod, methodNode);
                 }
             } catch (Exception e) {
                 // 2. Fallback: AST-based Type Tracking
                 // Handles cases where symbols (like Mono) are missing or strict resolution fails
                 resolveByAstAnalysis(targetMethod, call).ifPresent(methodNode ->
-                    addDependency(dependencies, targetMethod, methodNode));
+                    addDependency(dependencies, seenSignatures, targetMethod, methodNode));
             }
         }
         return dependencies;
@@ -129,11 +134,24 @@ public class DependencyResolver {
             .orElse(null);
     }
 
-    private void addDependency(List<MethodDeclaration> dependencies, MethodDeclaration target, MethodDeclaration found) {
+    private void addDependency(List<MethodDeclaration> dependencies, Set<String> seen, MethodDeclaration target, MethodDeclaration found) {
         injectSolver(found);
-        if (!found.equals(target) && !dependencies.contains(found)) {
+
+        String methodId = getMethodId(found);
+
+        // Avoid self-reference and duplicates
+        if (!found.equals(target) && !seen.contains(methodId)) {
+            seen.add(methodId);
             dependencies.add(found);
         }
+    }
+
+    // Generate a unique identifier for the method: ClassName.MethodSignature
+    private String getMethodId(MethodDeclaration md) {
+        String className = md.findAncestor(ClassOrInterfaceDeclaration.class)
+            .map(ClassOrInterfaceDeclaration::getNameAsString)
+            .orElse("Unknown");
+        return className + "." + md.getSignature().asString();
     }
 
     public List<FieldDeclaration> resolveFields(MethodDeclaration targetMethod) {
