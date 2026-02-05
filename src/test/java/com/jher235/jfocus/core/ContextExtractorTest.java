@@ -21,14 +21,14 @@ class ContextExtractorTest {
 
     @BeforeEach
     void setUp() {
-        CombinedTypeSolver typeSolver = new CombinedTypeSolver();
-        typeSolver.add(new ReflectionTypeSolver());
-        JavaSymbolSolver symbolSolver = new JavaSymbolSolver(typeSolver);
 
         extractor = new ContextExtractor(new ProjectParser());
 
+        CombinedTypeSolver typeSolver = new CombinedTypeSolver();
+        typeSolver.add(new ReflectionTypeSolver());
+
         ParserConfiguration config = new ParserConfiguration();
-        config.setSymbolResolver(symbolSolver);
+        config.setSymbolResolver(new JavaSymbolSolver(typeSolver));
         JavaParser parser = new JavaParser(config);
 
         String code = """
