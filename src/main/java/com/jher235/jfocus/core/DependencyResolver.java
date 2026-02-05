@@ -1,133 +1,169 @@
 package com.jher235.jfocus.core;
 
+import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.FieldAccessExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.resolution.Resolvable;
-import com.github.javaparser.resolution.UnsolvedSymbolException;
 import com.github.javaparser.resolution.declarations.ResolvedFieldDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
-import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
-/**
- * Resolves dependencies using JavaParser's SymbolSolver.
- * Unlike simple name matching, this accurately distinguishes between
- * project source code (e.g., MyUtil) and external libraries (e.g., System.out).
- */
 public class DependencyResolver {
 
-    private final JavaSymbolSolver symbolSolver;
+    // Common types to ignore during AST analysis
+    private static final Set<String> IGNORED_TYPES = Set.of(
+        "String", "Integer", "Long", "Boolean", "Object", "Optional",
+        "List", "Map", "Set", "Collections", "Arrays", "Objects", "var"
+    );
+    private final ProjectParser projectParser;
 
-    public DependencyResolver(JavaSymbolSolver symbolSolver) {
-        this.symbolSolver = symbolSolver;
+    public DependencyResolver(ProjectParser projectParser) {
+        this.projectParser = projectParser;
     }
 
-    /**
-     * Finds ALL methods called by the target method that belong to the project source code.
-     * This includes methods in other files (e.g., MyUtil.check()).
-     *
-     * @param targetMethod The method to analyze (Must be parsed with SymbolSolver configured)
-     * @return List of method declarations found in the source code
-     */
     public List<MethodDeclaration> resolveMethods(MethodDeclaration targetMethod) {
         injectSolver(targetMethod);
 
         List<MethodDeclaration> dependencies = new ArrayList<>();
-        // Collect all method calls
         List<MethodCallExpr> methodCalls = targetMethod.findAll(MethodCallExpr.class);
 
         for (MethodCallExpr call : methodCalls) {
             try {
+                // 1. Try Strict Resolution (SymbolSolver)
                 ResolvedMethodDeclaration resolved = call.resolve();
-
-                // JavaParserMethodDeclaration means it was parsed from a .java file in sourceRoot.
-                // ReflectionMethodDeclaration means it's from JDK or .jar library.
                 if (resolved instanceof JavaParserMethodDeclaration) {
                     MethodDeclaration methodNode = ((JavaParserMethodDeclaration) resolved).getWrappedNode();
-
-                    // Inject symbol solver for further analysis
-                    methodNode.findCompilationUnit().ifPresent(cu -> {
-                        if (!cu.containsData(Node.SYMBOL_RESOLVER_KEY)) {
-                            cu.setData(Node.SYMBOL_RESOLVER_KEY, this.symbolSolver);
-                        }
-                    });
-                    injectSolver(targetMethod);
-
-                    // Avoid self-recursion and duplicates
-                    if (!methodNode.equals(targetMethod) && !dependencies.contains(methodNode)) {
-                        dependencies.add(methodNode);
-                    }
+                    addDependency(dependencies, targetMethod, methodNode);
                 }
-            } catch (UnsolvedSymbolException e) {
-                // pass
-            } catch (RuntimeException e) {
-                System.err.println("Warning: Failed to resolve '" + call + "': " + e.getMessage());
+            } catch (Exception e) {
+                // 2. Fallback: AST-based Type Tracking
+                // Handles cases where symbols (like Mono) are missing or strict resolution fails
+                resolveByAstAnalysis(targetMethod, call).ifPresent(methodNode ->
+                    addDependency(dependencies, targetMethod, methodNode));
             }
         }
         return dependencies;
     }
 
     /**
-     * Finds ALL fields used by the target method that belong to the project source code.
-     * This handles inherited fields and fields from other classes if accessed directly.
-     * NameExpr(Variable Name) + FieldAccessExpr(this.-)
+     * Finds the method declaration by analyzing the AST structure.
+     * Traces variable types from Fields, Parameters, and Local Variables.
      */
-    public List<FieldDeclaration> resolveFields(MethodDeclaration targetMethod) {
-        injectSolver(targetMethod);
+    private Optional<MethodDeclaration> resolveByAstAnalysis(MethodDeclaration contextMethod, MethodCallExpr call) {
+        if (call.getScope().isEmpty()) return Optional.empty();
 
-        List<FieldDeclaration> dependencies = new ArrayList<>();
+        String variableName = call.getScope().get().toString(); // e.g., "user", "userInfoFacade"
+        String methodName = call.getNameAsString();             // e.g., "setName", "patchUserInfo"
 
-        // NameExpr
-        targetMethod.findAll(NameExpr.class).forEach(expr ->
-            resolveAndAddField(expr, dependencies));
+        // Ignore complex chains or static calls (e.g., repository.findById(...))
+        if (variableName.contains(".") || variableName.contains("(")) return Optional.empty();
 
-        // FieldAccessExpr
-        targetMethod.findAll(FieldAccessExpr.class).forEach(expr ->
-            resolveAndAddField(expr, dependencies));
+        // 1. Find the class containing the method
+        ClassOrInterfaceDeclaration currentClass = contextMethod.findAncestor(ClassOrInterfaceDeclaration.class).orElse(null);
+        if (currentClass == null) return Optional.empty();
 
-        return dependencies;
+        // 2. Resolve Variable Type (Priority: Local Var -> Parameter -> Field)
+        String typeName = findLocalVariableType(contextMethod, variableName);
+
+        if (typeName == null) {
+            typeName = findParameterType(contextMethod, variableName);
+        }
+        if (typeName == null) {
+            typeName = findFieldType(currentClass, variableName);
+        }
+
+        if (typeName == null || IGNORED_TYPES.contains(typeName)) return Optional.empty();
+
+        // 3. Search for the file corresponding to the type name
+        Optional<CompilationUnit> cuOpt = projectParser.findCompilationUnit(typeName);
+
+        if (cuOpt.isPresent()) {
+            CompilationUnit cu = cuOpt.get();
+            injectSolver(cu);
+
+            // 4. Find the method within the identified file
+            return cu.findAll(ClassOrInterfaceDeclaration.class).stream()
+                .flatMap(c -> c.getMethodsByName(methodName).stream())
+                .findFirst();
+        }
+
+        return Optional.empty();
     }
 
     /**
-     * Helper method that resolves an expression and adds it to the list if it is a field in our source code
+     * Scans for local variable declarations inside the method body.
+     * e.g., User user = ...;
      */
+    private String findLocalVariableType(MethodDeclaration method, String variableName) {
+        return method.findAll(VariableDeclarator.class).stream()
+            .filter(v -> v.getNameAsString().equals(variableName))
+            .map(v -> v.getType().asString())
+            .findFirst()
+            .orElse(null);
+    }
+
+    private String findFieldType(ClassOrInterfaceDeclaration clazz, String variableName) {
+        for (FieldDeclaration field : clazz.getFields()) {
+            for (VariableDeclarator variable : field.getVariables()) {
+                if (variable.getNameAsString().equals(variableName)) {
+                    return variable.getType().asString();
+                }
+            }
+        }
+        return null;
+    }
+
+    private String findParameterType(MethodDeclaration method, String variableName) {
+        return method.getParameters().stream()
+            .filter(p -> p.getNameAsString().equals(variableName))
+            .map(p -> p.getType().asString())
+            .findFirst()
+            .orElse(null);
+    }
+
+    private void addDependency(List<MethodDeclaration> dependencies, MethodDeclaration target, MethodDeclaration found) {
+        injectSolver(found);
+        if (!found.equals(target) && !dependencies.contains(found)) {
+            dependencies.add(found);
+        }
+    }
+
+    public List<FieldDeclaration> resolveFields(MethodDeclaration targetMethod) {
+        injectSolver(targetMethod);
+        List<FieldDeclaration> dependencies = new ArrayList<>();
+        targetMethod.findAll(NameExpr.class).forEach(expr -> resolveAndAddField(expr, dependencies));
+        targetMethod.findAll(FieldAccessExpr.class).forEach(expr -> resolveAndAddField(expr, dependencies));
+        return dependencies;
+    }
+
     private void resolveAndAddField(Resolvable<? extends ResolvedValueDeclaration> expr, List<FieldDeclaration> dependencies) {
         try {
             ResolvedValueDeclaration resolved = expr.resolve();
-
             if (resolved instanceof ResolvedFieldDeclaration resolvedField) {
-                // client's source code
                 if (resolvedField instanceof JavaParserFieldDeclaration) {
                     FieldDeclaration fieldNode = ((JavaParserFieldDeclaration) resolvedField).getWrappedNode();
-
-                    if (!dependencies.contains(fieldNode)) {
-                        dependencies.add(fieldNode);
-                    }
+                    if (!dependencies.contains(fieldNode)) dependencies.add(fieldNode);
                 }
             }
-        } catch (UnsolvedSymbolException e) {
-            // pass
-        } catch (RuntimeException e) {
-            System.err.println("Warning: Failed to resolve field expression '" + expr + "': " + e.getMessage());
-        }
+        } catch (Exception e) { /* Ignore */ }
     }
 
-    /**
-     * Helper to inject SymbolSolver into the CompilationUnit of a Node.
-     * This ensures subsequent resolve() calls within that file succeed.
-     */
     private void injectSolver(Node node) {
         node.findCompilationUnit().ifPresent(cu -> {
             if (!cu.containsData(Node.SYMBOL_RESOLVER_KEY)) {
-                cu.setData(Node.SYMBOL_RESOLVER_KEY, this.symbolSolver);
+                cu.setData(Node.SYMBOL_RESOLVER_KEY, projectParser.getSymbolSolver());
             }
         });
     }

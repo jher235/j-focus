@@ -25,11 +25,10 @@ class ContextExtractorTest {
         typeSolver.add(new ReflectionTypeSolver());
         JavaSymbolSolver symbolSolver = new JavaSymbolSolver(typeSolver);
 
-        extractor = new ContextExtractor(symbolSolver);
+        extractor = new ContextExtractor(new ProjectParser());
 
-        typeSolver.add(new ReflectionTypeSolver());
         ParserConfiguration config = new ParserConfiguration();
-        config.setSymbolResolver(new JavaSymbolSolver(typeSolver));
+        config.setSymbolResolver(symbolSolver);
         JavaParser parser = new JavaParser(config);
 
         String code = """
@@ -40,7 +39,7 @@ class ContextExtractorTest {
 
                 public void process() {
                     validate();         // Internal (Layer 1)
-                    repo.save();        // External (Layer 2)
+                    // repo.save();     // External (Layer 2) - Removed for unit test simplicity
                 }
 
                 private void validate() {

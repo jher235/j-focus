@@ -2,7 +2,6 @@ package com.jher235.jfocus.core;
 
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.jher235.jfocus.model.ContextResult;
 import java.util.HashSet;
 import java.util.List;
@@ -18,8 +17,8 @@ public class ContextExtractor {
 
     private final DependencyResolver dependencyResolver;
 
-    public ContextExtractor(JavaSymbolSolver javaSymbolSolver) {
-        this.dependencyResolver = new DependencyResolver(javaSymbolSolver);
+    public ContextExtractor(ProjectParser projectParser) {
+        this.dependencyResolver = new DependencyResolver(projectParser);
     }
 
     /**

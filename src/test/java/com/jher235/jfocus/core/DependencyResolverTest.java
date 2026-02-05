@@ -25,9 +25,8 @@ class DependencyResolverTest {
 
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
         typeSolver.add(new ReflectionTypeSolver());
-        JavaSymbolSolver symbolSolver = new JavaSymbolSolver(typeSolver);
 
-        resolver = new DependencyResolver(symbolSolver);
+        resolver = new DependencyResolver(new ProjectParser());
 
         typeSolver.add(new ReflectionTypeSolver()); // JDK
 
