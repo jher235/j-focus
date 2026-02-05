@@ -1,5 +1,7 @@
 package com.jher235.jfocus.core;
 
+import static com.jher235.jfocus.constant.JdkKnownTypes.IGNORED_SET;
+
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -18,15 +20,9 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 public class DependencyResolver {
 
-    // Common types to ignore during AST analysis
-    private static final Set<String> IGNORED_TYPES = Set.of(
-        "String", "Integer", "Long", "Boolean", "Object", "Optional",
-        "List", "Map", "Set", "Collections", "Arrays", "Objects", "var"
-    );
     private final ProjectParser projectParser;
 
     public DependencyResolver(ProjectParser projectParser) {
@@ -84,7 +80,7 @@ public class DependencyResolver {
             typeName = findFieldType(currentClass, variableName);
         }
 
-        if (typeName == null || IGNORED_TYPES.contains(typeName)) return Optional.empty();
+        if (typeName == null || IGNORED_SET.contains(typeName)) return Optional.empty();
 
         // 3. Search for the file corresponding to the type name
         Optional<CompilationUnit> cuOpt = projectParser.findCompilationUnit(typeName);
