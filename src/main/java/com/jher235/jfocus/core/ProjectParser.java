@@ -203,9 +203,11 @@ public class ProjectParser {
             return Optional.empty();
         }
 
+        String baseName = getBaseName(targetName);
+
         // 1. Check for an exact name match within candidates
         Optional<Path> exactMatch = matches.stream()
-            .filter(p -> p.getFileName().toString().equalsIgnoreCase(targetName))
+            .filter(p -> p.getFileName().toString().equalsIgnoreCase(baseName))
             .findFirst();
 
         if (exactMatch.isPresent()) {
@@ -219,17 +221,32 @@ public class ProjectParser {
             return Optional.of(matches.get(0));
         }
 
-        // 3. Ambiguous results (Interactive Selection)
-        // TODO: Implement interactive selection if needed
-        System.err.println("Ambiguous file name. Found " + matches.size() + " matches:");
-        for (int i = 0; i < matches.size(); i++) {
-            System.out.println(String.format("   [%d] %s", i + 1, sourceRoot.relativize(matches.get(i))));
+
+        // 3. prevent blocking in non-interactive environments
+        if (System.console() == null) {
+            System.err.println("Ambiguous file name in non-interactive session. Please specify the full path.");
+            return Optional.empty();
         }
 
-        // prevent blocking in non-interactive environments
-        if (System.console() == null) {
-            System.err.println("Error: Running in non-interactive mode. Please specify the full path.");
-            return Optional.empty();
+        // 4. Delegate UI interaction (Display list & Get input)
+        return promptUserForSelection(matches, targetName);
+    }
+
+    /**
+     * Displays the list of candidates and handles user input.
+     * Logic for printing the list is moved here for better encapsulation.
+     */
+    private Optional<Path> promptUserForSelection(List<Path> matches, String targetName){
+        System.out.println("Ambiguous file name. Found " + matches.size() + " matches for '" + targetName + "':");
+
+        // Print candidates
+        for (int i = 0; i < matches.size(); i++) {
+            Path path = matches.get(i);
+            String fileName = path.getFileName().toString();
+            // Show relative path for context (using / for cross-platform readability)
+            String parentPath = sourceRoot.relativize(path.getParent()).toString().replace("\\", "/");
+
+            System.out.printf("   [%d] %-30s (%s)%n", i + 1, fileName, parentPath);
         }
 
         System.out.print("Select a file number (1-" + matches.size() + "): ");
