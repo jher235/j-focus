@@ -80,9 +80,10 @@ public class ProjectParser {
     }
 
     private String normalizeFileName(String fileName) {
-        return fileName.toLowerCase().endsWith(".java")
-            ? fileName
-            : fileName + ".java";
+        if (fileName.toLowerCase().endsWith(".java")) {
+            return fileName.substring(0, fileName.length() - 5) + ".java";
+        }
+        return fileName + ".java";
     }
 
     /**
