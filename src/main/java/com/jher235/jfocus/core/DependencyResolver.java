@@ -1,7 +1,5 @@
 package com.jher235.jfocus.core;
 
-import static com.jher235.jfocus.constant.JdkKnownTypes.IGNORED_SET;
-
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -17,6 +15,7 @@ import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
+import com.jher235.jfocus.constant.JdkKnownTypes;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -85,7 +84,13 @@ public class DependencyResolver {
             typeName = findFieldType(currentClass, variableName);
         }
 
-        if (typeName == null || IGNORED_SET.contains(typeName)) return Optional.empty();
+        if (typeName == null) return Optional.empty();
+
+        if (typeName.contains("<")) {
+            typeName = typeName.substring(0, typeName.indexOf("<")).trim();
+        }
+
+        if (JdkKnownTypes.contains(typeName)) return Optional.empty();
 
         // 3. Search for the file corresponding to the type name
         Optional<CompilationUnit> cuOpt = projectParser.findCompilationUnit(typeName);
