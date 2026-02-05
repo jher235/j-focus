@@ -72,9 +72,14 @@ public class DependencyResolver {
 
         // 2. Handle Unscoped Calls (e.g., internalMethod()) -> Implicit 'this'
         if (call.getScope().isEmpty()) {
-            return currentClass.getMethodsByName(methodName).stream()
+            // 1. Check current class
+            Optional<MethodDeclaration> local = currentClass.getMethodsByName(methodName).stream()
                 .filter(m -> isArityMatch(m, argCount))
                 .findFirst();
+            if (local.isPresent()) return local;
+
+            // 2. Check Superclass chain (Fallback for inherited methods)
+            return findInSuperClass(currentClass, methodName, argCount);
         }
 
         String rawScope = call.getScope().get().toString(); // e.g., "user", "this.repository"
@@ -150,6 +155,26 @@ public class DependencyResolver {
     }
 
     /**
+     * Traverses the superclass chain to find a method by name and arity.
+     */
+    private Optional<MethodDeclaration> findInSuperClass(ClassOrInterfaceDeclaration currentClass, String methodName, int argCount) {
+        String superType = currentClass.getExtendedTypes().stream()
+            .findFirst()
+            .map(t -> t.getNameAsString())
+            .orElse(null);
+
+        if (superType == null || JdkKnownTypes.contains(superType)) return Optional.empty();
+
+        return projectParser.findCompilationUnit(superType).flatMap(cu -> {
+            injectSolver(cu);
+            return cu.findAll(ClassOrInterfaceDeclaration.class).stream()
+                .flatMap(c -> c.getMethodsByName(methodName).stream())
+                .filter(m -> isArityMatch(m, argCount))
+                .findFirst();
+        });
+    }
+
+    /**
      * Helper to check if method parameters match the argument count (handling varargs).
      */
     private boolean isArityMatch(MethodDeclaration method, int argCount) {
@@ -209,18 +234,25 @@ public class DependencyResolver {
         }
     }
 
-    // Generate a unique identifier for the method: ClassName.MethodSignature
+    /**
+     * Generate a robust unique identifier for the method.
+     * Uses getFullyQualifiedName() to prevent collisions between nested classes.
+     */
     private String getMethodId(MethodDeclaration md) {
-        String className = md.findAncestor(ClassOrInterfaceDeclaration.class)
-            .map(ClassOrInterfaceDeclaration::getNameAsString)
-            .orElse("Unknown");
+        String fqcn = md.findAncestor(ClassOrInterfaceDeclaration.class)
+            .flatMap(ClassOrInterfaceDeclaration::getFullyQualifiedName)
+            .orElseGet(() -> {
+                // Fallback for local classes or nodes not in a CU
+                String className = md.findAncestor(ClassOrInterfaceDeclaration.class)
+                    .map(ClassOrInterfaceDeclaration::getNameAsString)
+                    .orElse("Unknown");
+                String pkg = md.findCompilationUnit()
+                    .flatMap(CompilationUnit::getPackageDeclaration)
+                    .map(pd -> pd.getNameAsString())
+                    .orElse("");
+                return pkg.isEmpty() ? className : pkg + "." + className;
+            });
 
-        String pkg = md.findCompilationUnit()
-            .flatMap(CompilationUnit::getPackageDeclaration)
-            .map(pd -> pd.getNameAsString())
-            .orElse("");
-
-        String fqcn = pkg.isEmpty() ? className : pkg + "." + className;
         return fqcn + "." + md.getSignature().asString();
     }
 
