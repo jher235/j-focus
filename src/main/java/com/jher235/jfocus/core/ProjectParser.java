@@ -47,6 +47,10 @@ public class ProjectParser {
         this.javaParser = new JavaParser(config);
     }
 
+    public JavaSymbolSolver getSymbolSolver() {
+        return this.symbolSolver;
+    }
+
     /**
      * Parses a Java file into a CompilationUnit.
      * Strategies:

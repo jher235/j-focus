@@ -1,5 +1,6 @@
 package com.jher235.jfocus.core;
 
+import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.expr.FieldAccessExpr;
@@ -10,6 +11,7 @@ import com.github.javaparser.resolution.UnsolvedSymbolException;
 import com.github.javaparser.resolution.declarations.ResolvedFieldDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
+import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
 import java.util.ArrayList;
@@ -21,6 +23,12 @@ import java.util.List;
  * project source code (e.g., MyUtil) and external libraries (e.g., System.out).
  */
 public class DependencyResolver {
+
+    private final JavaSymbolSolver symbolSolver;
+
+    public DependencyResolver(JavaSymbolSolver symbolSolver) {
+        this.symbolSolver = symbolSolver;
+    }
 
     /**
      * Finds ALL methods called by the target method that belong to the project source code.
@@ -44,6 +52,13 @@ public class DependencyResolver {
                 if (resolved instanceof JavaParserMethodDeclaration) {
                     MethodDeclaration methodNode = ((JavaParserMethodDeclaration) resolved).getWrappedNode();
 
+                    // Inject symbol solver for further analysis
+                    methodNode.findCompilationUnit().ifPresent(cu -> {
+                        if (!cu.containsData(Node.SYMBOL_RESOLVER_KEY)) {
+                            cu.setData(Node.SYMBOL_RESOLVER_KEY, this.symbolSolver);
+                        }
+                    });
+
                     // Avoid self-recursion and duplicates
                     if (!methodNode.equals(targetMethod) && !dependencies.contains(methodNode)) {
                         dependencies.add(methodNode);
@@ -55,7 +70,6 @@ public class DependencyResolver {
                 System.err.println("Warning: Failed to resolve '" + call + "': " + e.getMessage());
             }
         }
-
         return dependencies;
     }
 

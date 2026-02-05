@@ -21,9 +21,12 @@ class ContextExtractorTest {
 
     @BeforeEach
     void setUp() {
-        extractor = new ContextExtractor();
-
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
+        typeSolver.add(new ReflectionTypeSolver());
+        JavaSymbolSolver symbolSolver = new JavaSymbolSolver(typeSolver);
+
+        extractor = new ContextExtractor(symbolSolver);
+
         typeSolver.add(new ReflectionTypeSolver());
         ParserConfiguration config = new ParserConfiguration();
         config.setSymbolResolver(new JavaSymbolSolver(typeSolver));
