@@ -4,6 +4,7 @@ import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
+import com.github.javaparser.ast.PackageDeclaration;
 import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
@@ -25,14 +26,14 @@ import java.util.Scanner;
 public class ProjectParser {
 
     private final Path projectRoot;
-    private final Path sourceRoot;
-    private final JavaSymbolSolver symbolSolver;
-    private final JavaParser javaParser;
+    private Path sourceRoot; // Mutable: can be updated based on package structure
+    private JavaSymbolSolver symbolSolver;
+    private JavaParser javaParser;
 
     public ProjectParser() {
         this.projectRoot = Paths.get(".").toAbsolutePath().normalize();
 
-        // Resolve source root (Prioritize src/main/java for correct package resolution)
+        // Initial guess: Prioritize src/main/java
         Path standardSourceRoot = projectRoot.resolve("src/main/java");
         if (Files.exists(standardSourceRoot)) {
             this.sourceRoot = standardSourceRoot;
@@ -42,16 +43,22 @@ public class ProjectParser {
             System.err.println("Warning: 'src/main/java' not found. Fallback to project root.");
         }
 
+        initializeParser(this.sourceRoot);
+    }
+
+    private void initializeParser(Path root) {
         // Configure Parser to support modern Java features (Java 17+)
         ParserConfiguration config = new ParserConfiguration();
         config.setLanguageLevel(ParserConfiguration.LanguageLevel.BLEEDING_EDGE);
 
-        // Configure TypeSolver
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
         typeSolver.add(new ReflectionTypeSolver());
 
-        // Pass configuration to solver to ensure it parses dependencies correctly
-        typeSolver.add(new JavaParserTypeSolver(sourceRoot, config));
+        // Add source root solver if it's a directory
+        if (Files.isDirectory(root)) {
+            // Pass configuration to solver to ensure it parses dependencies correctly
+            typeSolver.add(new JavaParserTypeSolver(root, config));
+        }
 
         this.symbolSolver = new JavaSymbolSolver(typeSolver);
         config.setSymbolResolver(symbolSolver);
@@ -95,10 +102,61 @@ public class ProjectParser {
                 return Optional.empty();
             }
 
-            return parsePath(fileOpt.get());
+            Path filePath = fileOpt.get();
+
+            // Critical: Dynamically recalculate Source Root based on package declaration
+            reconfigureSolverFromPackage(filePath);
+
+            return parsePath(filePath);
 
         } catch (IOException e) {
             return Optional.empty();
+        }
+    }
+
+    /**
+     * Reads the package declaration from the file and aligns the Source Root.
+     * e.g., if file is at .../src/foo/Bar.java and package is 'foo', root becomes .../src
+     */
+    private void reconfigureSolverFromPackage(Path filePath) {
+        try {
+            // Light parse to check package (without resolving symbols yet)
+            CompilationUnit cu = javaParser.parse(filePath).getResult().orElse(null);
+            if (cu == null) return;
+
+            Path calculatedRoot = this.projectRoot;
+            Optional<PackageDeclaration> pkgOpt = cu.getPackageDeclaration();
+
+            if (pkgOpt.isPresent()) {
+                String packageName = pkgOpt.get().getNameAsString();
+                // Convert dots to path separators
+                Path packagePath = Paths.get(packageName.replace('.', '/'));
+                Path parentDir = filePath.getParent();
+
+                // Check if the file path ends with the package structure
+                if (parentDir != null && parentDir.endsWith(packagePath)) {
+                    // Walk up the directory tree to find the root
+                    int levelsUp = packagePath.getNameCount();
+                    Path realRoot = parentDir;
+                    for (int i = 0; i < levelsUp; i++) {
+                        realRoot = realRoot.getParent();
+                    }
+                    calculatedRoot = realRoot;
+                }
+            } else {
+                // Default package: The parent directory is the root
+                calculatedRoot = filePath.getParent();
+            }
+
+            // Re-initialize solver only if the root has changed
+            if (calculatedRoot != null && !calculatedRoot.equals(this.sourceRoot)) {
+                System.err.println("Detected dynamic Source Root: " + calculatedRoot);
+                this.sourceRoot = calculatedRoot;
+                initializeParser(this.sourceRoot);
+            }
+
+        } catch (Exception e) {
+            // Fallback to existing configuration on error
         }
     }
 
@@ -113,9 +171,6 @@ public class ProjectParser {
         }
     }
 
-    /**
-     * Attempts to resolve the file using direct paths (Absolute, Relative to Project/Source).
-     */
     private Optional<Path> resolveDirectPath(String originalInput, String targetName) {
         try {
             Path directInput = Paths.get(originalInput);
@@ -132,22 +187,19 @@ public class ProjectParser {
         return Optional.empty();
     }
 
-    /**
-     * Scans the source directory recursively for potential matches.
-     * Optimized using walkFileTree to skip irrelevant directories.
-     */
     private List<Path> scanForCandidates(String targetName) throws IOException {
         String baseName = getBaseName(targetName);
         String searchTerm = baseName.toLowerCase().replace(".java", "");
 
-        if (!Files.exists(sourceRoot)) return Collections.emptyList();
+        // Scan projectRoot to cover multi-module or non-standard layouts
+        // (Using projectRoot instead of sourceRoot ensures we find files even if initial guess was wrong)
+        if (!Files.exists(projectRoot)) return Collections.emptyList();
         List<Path> matches = new ArrayList<>();
 
-        Files.walkFileTree(sourceRoot, new SimpleFileVisitor<Path>() {
+        Files.walkFileTree(projectRoot, new SimpleFileVisitor<Path>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
                 String dirName = dir.getFileName().toString();
-                // Performance Optimization: Skip heavy/irrelevant directories
                 if (dirName.startsWith(".") ||
                     dirName.equals("build") ||
                     dirName.equals("out") ||
@@ -174,16 +226,11 @@ public class ProjectParser {
             .toList();
     }
 
-    /**
-     * Resolves the best match from the candidate list.
-     * Handles ambiguity based on interactivity mode.
-     */
     private Optional<Path> selectBestCandidate(List<Path> matches, String targetName, boolean allowInteractive) {
         if (matches.isEmpty()) return Optional.empty();
 
         String baseName = getBaseName(targetName);
 
-        // 1. Check for an exact name match
         Optional<Path> exactMatch = matches.stream()
             .filter(p -> p.getFileName().toString().equalsIgnoreCase(baseName))
             .findFirst();
@@ -193,19 +240,15 @@ public class ProjectParser {
             return exactMatch;
         }
 
-        // 2. Single candidate found
         if (matches.size() == 1) {
             if (allowInteractive) System.out.println("Found file: " + matches.get(0).getFileName());
             return Optional.of(matches.get(0));
         }
 
-        // 3. Fallback for silent mode (Pick first or fail)
         if (!allowInteractive) {
-            // In silent mode (dependency resolution), picking the first match is better than failing
             return Optional.of(matches.get(0));
         }
 
-        // 4. Interactive selection
         if (System.console() == null) {
             System.err.println("Ambiguous file name in non-interactive session.");
             return Optional.empty();
@@ -214,12 +257,13 @@ public class ProjectParser {
         return promptUserForSelection(matches, targetName);
     }
 
-    private Optional<Path> promptUserForSelection(List<Path> matches, String targetName){
+    private Optional<Path> promptUserForSelection(List<Path> matches, String targetName) {
         System.out.println("Ambiguous file name. Found " + matches.size() + " matches:");
 
         for (int i = 0; i < matches.size(); i++) {
             Path path = matches.get(i);
-            String parentPath = sourceRoot.relativize(path.getParent()).toString().replace("\\", "/");
+            // Display path relative to project root for clarity
+            String parentPath = projectRoot.relativize(path.getParent()).toString().replace("\\", "/");
             System.out.printf("   [%d] %-30s (%s)%n", i + 1, path.getFileName(), parentPath);
         }
 
