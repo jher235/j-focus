@@ -239,12 +239,15 @@ public class ProjectParser {
     private Optional<Path> promptUserForSelection(List<Path> matches, String targetName){
         System.out.println("Ambiguous file name. Found " + matches.size() + " matches for '" + targetName + "':");
 
-        // Print candidates
         for (int i = 0; i < matches.size(); i++) {
             Path path = matches.get(i);
             String fileName = path.getFileName().toString();
-            // Show relative path for context (using / for cross-platform readability)
-            String parentPath = sourceRoot.relativize(path.getParent()).toString().replace("\\", "/");
+
+            // Prevent NullPointerException if path has no parent
+            Path parent = path.getParent();
+            String parentPath = (parent != null)
+                ? sourceRoot.relativize(parent).toString().replace("\\", "/")
+                : "";
 
             System.out.printf("   [%d] %-30s (%s)%n", i + 1, fileName, parentPath);
         }
