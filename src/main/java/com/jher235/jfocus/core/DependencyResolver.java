@@ -60,10 +60,11 @@ public class DependencyResolver {
     /**
      * Finds the method declaration by analyzing the AST structure.
      * Traces variable types from Fields, Parameters, and Local Variables.
-     * Handles unscoped calls (implicit this) and explicit scopes (this., super.).
+     * Handles unscoped calls (implicit this), explicit scopes (this., super.), and method overloading.
      */
     private Optional<MethodDeclaration> resolveByAstAnalysis(MethodDeclaration contextMethod, MethodCallExpr call) {
-        String methodName = call.getNameAsString(); // e.g., "setName", "patchUserInfo"
+        String methodName = call.getNameAsString();
+        int argCount = call.getArguments().size();
 
         // 1. Find the class containing the method
         ClassOrInterfaceDeclaration currentClass = contextMethod.findAncestor(ClassOrInterfaceDeclaration.class).orElse(null);
@@ -71,30 +72,52 @@ public class DependencyResolver {
 
         // 2. Handle Unscoped Calls (e.g., internalMethod()) -> Implicit 'this'
         if (call.getScope().isEmpty()) {
-            return currentClass.getMethodsByName(methodName).stream().findFirst();
+            return currentClass.getMethodsByName(methodName).stream()
+                .filter(m -> isArityMatch(m, argCount))
+                .findFirst();
         }
 
-        String variableName = call.getScope().get().toString(); // e.g., "user", "this.repository"
+        String rawScope = call.getScope().get().toString(); // e.g., "user", "this.repository"
+        String variableName = rawScope;
 
-        // 3. Normalize Scope (Handle this.field / super.field)
+        boolean explicitThis = "this".equals(rawScope) || rawScope.startsWith("this.");
+        boolean explicitSuper = "super".equals(rawScope) || rawScope.startsWith("super.");
+
+        // 3. Normalize Scope (Strip this./super.)
         if (variableName.contains(".")) {
-            if (variableName.startsWith("this.") || variableName.startsWith("super.")) {
-                // Strip prefix: "this.repository" -> "repository"
+            if (explicitThis || explicitSuper) {
                 variableName = variableName.substring(variableName.indexOf('.') + 1);
             } else {
-                // Ignore other complex chains (e.g., "repo.find().map()")
-                return Optional.empty();
+                return Optional.empty(); // Ignore complex chains
             }
         }
 
         // 4. Resolve Variable Type
         String typeName = null;
 
-        // Handle exact "this" or "super" (e.g., this.method())
-        if ("this".equals(variableName) || "super".equals(variableName)) {
-            typeName = currentClass.getNameAsString();
+        if (explicitThis) {
+            // Case: this.method() -> Type is Current Class
+            if ("this".equals(rawScope)) {
+                typeName = currentClass.getNameAsString();
+            }
+            // Case: this.field.method() -> Find field strictly
+            else {
+                typeName = findFieldType(currentClass, variableName);
+            }
+        } else if (explicitSuper) {
+            // Case: super.method() -> Type is Parent Class
+            if ("super".equals(rawScope)) {
+                typeName = currentClass.getExtendedTypes().stream()
+                    .findFirst()
+                    .map(t -> t.getNameAsString())
+                    .orElse("Object");
+            }
+            // Case: super.field.method() -> Not supported in fallback (complex)
+            else {
+                return Optional.empty();
+            }
         } else {
-            // Priority: Local Var -> Parameter -> Field
+            // Case: variable.method() -> Priority: Local -> Param -> Field
             typeName = findLocalVariableType(contextMethod, variableName);
             if (typeName == null) typeName = findParameterType(contextMethod, variableName);
             if (typeName == null) typeName = findFieldType(currentClass, variableName);
@@ -102,7 +125,7 @@ public class DependencyResolver {
 
         if (typeName == null) return Optional.empty();
 
-        // Strip generics (e.g., List<User> -> List)
+        // Strip generics
         if (typeName.contains("<")) {
             typeName = typeName.substring(0, typeName.indexOf("<")).trim();
         }
@@ -116,18 +139,32 @@ public class DependencyResolver {
             CompilationUnit cu = cuOpt.get();
             injectSolver(cu);
 
-            Optional<MethodDeclaration> realMethod = cu.findAll(ClassOrInterfaceDeclaration.class).stream()
+            // 6. Find method with Overload Filtering (Arg Count Match)
+            return cu.findAll(ClassOrInterfaceDeclaration.class).stream()
                 .flatMap(c -> c.getMethodsByName(methodName).stream())
+                .filter(m -> isArityMatch(m, argCount)) // [New] 오버로딩 필터링
                 .findFirst();
-
-            if (realMethod.isPresent()) return realMethod;
-
-            // Note: Lombok synthetic method generation logic was removed for simplicity.
         }
 
         return Optional.empty();
     }
 
+    /**
+     * Helper to check if method parameters match the argument count (handling varargs).
+     */
+    private boolean isArityMatch(MethodDeclaration method, int argCount) {
+        int paramCount = method.getParameters().size();
+
+        if (paramCount == argCount) return true;
+
+        // Handle VarArgs (e.g., String... args)
+        if (paramCount > 0 && method.getParameter(paramCount - 1).isVarArgs()) {
+            // VarArgs allows argCount >= paramCount - 1
+            return argCount >= (paramCount - 1);
+        }
+
+        return false;
+    }
 
     /**
      * Scans for local variable declarations inside the method body.
