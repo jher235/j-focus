@@ -132,26 +132,36 @@ public class ProjectParser {
      * Filters by extension, exact match, and partial match.
      */
     private List<Path> scanForCandidates(String targetName) throws IOException {
-        String searchTerm = targetName.toLowerCase().replace(".java", "");
+        // Extract base filename to support inputs with directory paths (e.g., "api/User" -> "User")
+        String baseName = getBaseName(targetName);
+        String searchTerm = baseName.toLowerCase().replace(".java", "");
 
         try (Stream<Path> paths = Files.walk(sourceRoot)) {
             return paths
                 .filter(Files::isRegularFile)
-                .filter(path -> isMatch(path, targetName, searchTerm))
+                .filter(path -> isMatch(path, baseName, searchTerm))
                 .sorted((p1, p2) -> compareRelevance(p1, p2, searchTerm))
                 .limit(10)
                 .toList();
         }
     }
 
-    private boolean isMatch(Path path, String targetName, String searchTerm) {
+    private String getBaseName(String path) {
+        int lastSlash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        if (lastSlash >= 0) {
+            return path.substring(lastSlash + 1);
+        }
+        return path;
+    }
+
+    private boolean isMatch(Path path, String baseName, String searchTerm) {
         String fileName = path.getFileName().toString();
         if (!fileName.toLowerCase().endsWith(".java")) {
             return false;
         }
 
         // Check A: Exact match (Case-Insensitive)
-        if (fileName.equalsIgnoreCase(targetName)) {
+        if (fileName.equalsIgnoreCase(baseName)) {
             return true;
         }
 
