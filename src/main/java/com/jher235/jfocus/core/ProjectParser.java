@@ -226,6 +226,12 @@ public class ProjectParser {
             System.out.println(String.format("   [%d] %s", i + 1, sourceRoot.relativize(matches.get(i))));
         }
 
+        // prevent blocking in non-interactive environments
+        if (System.console() == null) {
+            System.err.println("Error: Running in non-interactive mode. Please specify the full path.");
+            return Optional.empty();
+        }
+
         System.out.print("Select a file number (1-" + matches.size() + "): ");
 
         try {
