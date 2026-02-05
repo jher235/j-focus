@@ -68,20 +68,22 @@ public class DependencyResolver {
         String methodName = call.getNameAsString();             // e.g., "setName", "patchUserInfo"
 
         // Ignore complex chains or static calls (e.g., repository.findById(...))
-        if (variableName.contains(".") || variableName.contains("(")) return Optional.empty();
+        if (variableName.contains(".") && !variableName.startsWith("this.")) return Optional.empty();
+        if (variableName.contains("(")) return Optional.empty();
 
         // 1. Find the class containing the method
         ClassOrInterfaceDeclaration currentClass = contextMethod.findAncestor(ClassOrInterfaceDeclaration.class).orElse(null);
         if (currentClass == null) return Optional.empty();
 
         // 2. Resolve Variable Type (Priority: Local Var -> Parameter -> Field)
-        String typeName = findLocalVariableType(contextMethod, variableName);
-
-        if (typeName == null) {
-            typeName = findParameterType(contextMethod, variableName);
-        }
-        if (typeName == null) {
-            typeName = findFieldType(currentClass, variableName);
+        String typeName = null;
+        if ("this".equals(variableName) || "super".equals(variableName)) {
+            typeName = currentClass.getNameAsString();
+        } else {
+            // Priority: Local Var -> Parameter -> Field
+            typeName = findLocalVariableType(contextMethod, variableName);
+            if (typeName == null) typeName = findParameterType(contextMethod, variableName);
+            if (typeName == null) typeName = findFieldType(currentClass, variableName);
         }
 
         if (typeName == null) return Optional.empty();
@@ -156,7 +158,14 @@ public class DependencyResolver {
         String className = md.findAncestor(ClassOrInterfaceDeclaration.class)
             .map(ClassOrInterfaceDeclaration::getNameAsString)
             .orElse("Unknown");
-        return className + "." + md.getSignature().asString();
+
+        String pkg = md.findCompilationUnit()
+            .flatMap(CompilationUnit::getPackageDeclaration)
+            .map(pd -> pd.getNameAsString())
+            .orElse("");
+
+        String fqcn = pkg.isEmpty() ? className : pkg + "." + className;
+        return fqcn + "." + md.getSignature().asString();
     }
 
     public List<FieldDeclaration> resolveFields(MethodDeclaration targetMethod) {
