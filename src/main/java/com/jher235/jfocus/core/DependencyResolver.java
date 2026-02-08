@@ -9,7 +9,6 @@ import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.FieldAccessExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.NameExpr;
-import com.github.javaparser.ast.nodeTypes.NodeWithName;
 import com.github.javaparser.resolution.Resolvable;
 import com.github.javaparser.resolution.declarations.ResolvedFieldDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
@@ -17,12 +16,12 @@ import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
 import com.jher235.jfocus.constant.JdkKnownTypes;
+import com.jher235.jfocus.util.AstUtils;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 public class DependencyResolver {
 
@@ -255,35 +254,13 @@ public class DependencyResolver {
     private void addDependency(List<MethodDeclaration> dependencies, Set<String> seen, MethodDeclaration target, MethodDeclaration found) {
         injectSolver(found);
 
-        String methodId = getMethodId(found);
+        String methodId = AstUtils.createMethodId(found);
 
         // Avoid self-reference and duplicates
         if (!found.equals(target) && !seen.contains(methodId)) {
             seen.add(methodId);
             dependencies.add(found);
         }
-    }
-
-    /**
-     * Generate a robust unique identifier for the method.
-     * Uses getFullyQualifiedName() to prevent collisions between nested classes.
-     */
-    private String getMethodId(MethodDeclaration md) {
-        String fqcn = md.findAncestor(ClassOrInterfaceDeclaration.class)
-            .flatMap(ClassOrInterfaceDeclaration::getFullyQualifiedName)
-            .orElseGet(() -> {
-                // Fallback for local classes or nodes not in a CU
-                String className = md.findAncestor(ClassOrInterfaceDeclaration.class)
-                    .map(ClassOrInterfaceDeclaration::getNameAsString)
-                    .orElse("Unknown");
-                String pkg = md.findCompilationUnit()
-                    .flatMap(CompilationUnit::getPackageDeclaration)
-                    .map(NodeWithName::getNameAsString)
-                    .orElse("");
-                return pkg.isEmpty() ? className : pkg + "." + className;
-            });
-
-        return fqcn + "." + md.getSignature().asString();
     }
 
     public List<FieldDeclaration> resolveFields(MethodDeclaration targetMethod) {
@@ -306,7 +283,7 @@ public class DependencyResolver {
             if (resolved instanceof ResolvedFieldDeclaration resolvedField) {
                 if (resolvedField instanceof JavaParserFieldDeclaration) {
                     FieldDeclaration fieldNode = ((JavaParserFieldDeclaration) resolvedField).getWrappedNode();
-                    String fieldId = getFieldId(fieldNode);
+                    String fieldId = AstUtils.createFieldId(fieldNode);
 
                     if (!seenFields.contains(fieldId)) {
                         seenFields.add(fieldId);
@@ -315,19 +292,6 @@ public class DependencyResolver {
                 }
             }
         } catch (Exception e) { /* Ignore */ }
-    }
-
-    // Generate Unique Field ID based on the Declaration Node
-    private String getFieldId(FieldDeclaration fd) {
-        String className = fd.findAncestor(ClassOrInterfaceDeclaration.class)
-            .map(c -> c.getFullyQualifiedName().orElse(c.getNameAsString()))
-            .orElse("Unknown");
-
-        String fieldNames = fd.getVariables().stream()
-            .map(v -> v.getNameAsString())
-            .collect(Collectors.joining(","));
-
-        return className + "#" + fieldNames;
     }
 
     private void injectSolver(Node node) {

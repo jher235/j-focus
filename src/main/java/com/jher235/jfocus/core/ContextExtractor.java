@@ -1,10 +1,9 @@
 package com.jher235.jfocus.core;
 
-import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.ast.nodeTypes.NodeWithName;
 import com.jher235.jfocus.model.ContextResult;
+import com.jher235.jfocus.util.AstUtils;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -37,7 +36,7 @@ public class ContextExtractor {
 
         // Track visited methods to prevent infinite loops during recursion
         Set<String> visited = new HashSet<>();
-        visited.add(getMethodId(targetMethod));
+        visited.add(AstUtils.createMethodId(targetMethod));
 
         // Start recursive analysis
         extractRecursive(targetMethod, targetMethod, result, visited);
@@ -60,7 +59,7 @@ public class ContextExtractor {
             .orElse(null);
 
         for (MethodDeclaration dep : dependencies) {
-            String depId = getMethodId(dep);
+            String depId = AstUtils.createMethodId(dep);
 
             // Skip if already visited to avoid cyclic dependency loops
             if (visited.contains(depId)) {
@@ -84,20 +83,4 @@ public class ContextExtractor {
         }
     }
 
-    private String getMethodId(MethodDeclaration md) {
-        String fqcn = md.findAncestor(ClassOrInterfaceDeclaration.class)
-            .flatMap(ClassOrInterfaceDeclaration::getFullyQualifiedName)
-            .orElseGet(() -> {
-                String className = md.findAncestor(ClassOrInterfaceDeclaration.class)
-                    .map(ClassOrInterfaceDeclaration::getNameAsString)
-                    .orElse("Unknown");
-                String pkg = md.findCompilationUnit()
-                    .flatMap(CompilationUnit::getPackageDeclaration)
-                    .map(NodeWithName::getNameAsString)
-                    .orElse("");
-                return pkg.isEmpty() ? className : pkg + "." + className;
-            });
-
-        return fqcn + "." + md.getSignature().asString();
-    }
 }
