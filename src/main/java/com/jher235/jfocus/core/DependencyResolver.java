@@ -72,13 +72,11 @@ public class DependencyResolver {
 
         // 2. Handle Unscoped Calls (e.g., internalMethod()) -> Implicit 'this'
         if (call.getScope().isEmpty()) {
-            // 1. Check current class
             Optional<MethodDeclaration> local = currentClass.getMethodsByName(methodName).stream()
                 .filter(m -> isArityMatch(m, argCount))
                 .findFirst();
             if (local.isPresent()) return local;
 
-            // 2. Check Superclass chain (Fallback for inherited methods)
             return findInSuperClass(currentClass, methodName, argCount);
         }
 
@@ -101,23 +99,25 @@ public class DependencyResolver {
         String typeName = null;
 
         if (explicitThis) {
-            // Case: this.method() -> Type is Current Class
+            // Case: this.method() -> Resolve directly within current class (including inheritance)
             if ("this".equals(rawScope)) {
-                typeName = currentClass.getNameAsString();
+                Optional<MethodDeclaration> local = currentClass.getMethodsByName(methodName).stream()
+                    .filter(m -> isArityMatch(m, argCount))
+                    .findFirst();
+                if (local.isPresent()) return local;
+
+                return findInSuperClass(currentClass, methodName, argCount);
             }
             // Case: this.field.method() -> Find field strictly
             else {
                 typeName = findFieldType(currentClass, variableName);
             }
         } else if (explicitSuper) {
-            // Case: super.method() -> Type is Parent Class
+            // Case: super.method() -> Type is Parent Class (Start traversal from parent)
             if ("super".equals(rawScope)) {
-                typeName = currentClass.getExtendedTypes().stream()
-                    .findFirst()
-                    .map(t -> t.getNameAsString())
-                    .orElse("Object");
+                return findInSuperClass(currentClass, methodName, argCount);
             }
-            // Case: super.field.method() -> Not supported in fallback (complex)
+            // Case: super.field.method() -> Not supported in fallback
             else {
                 return Optional.empty();
             }
@@ -144,10 +144,10 @@ public class DependencyResolver {
             CompilationUnit cu = cuOpt.get();
             injectSolver(cu);
 
-            // 6. Find method with Overload Filtering (Arg Count Match)
+            // 6. Find method with Overload Filtering
             return cu.findAll(ClassOrInterfaceDeclaration.class).stream()
                 .flatMap(c -> c.getMethodsByName(methodName).stream())
-                .filter(m -> isArityMatch(m, argCount)) // [New] 오버로딩 필터링
+                .filter(m -> isArityMatch(m, argCount))
                 .findFirst();
         }
 
@@ -155,23 +155,40 @@ public class DependencyResolver {
     }
 
     /**
-     * Traverses the superclass chain to find a method by name and arity.
+     * Traverses the FULL superclass chain to find a method by name and arity.
      */
-    private Optional<MethodDeclaration> findInSuperClass(ClassOrInterfaceDeclaration currentClass, String methodName, int argCount) {
-        String superType = currentClass.getExtendedTypes().stream()
-            .findFirst()
-            .map(t -> t.getNameAsString())
-            .orElse(null);
+    private Optional<MethodDeclaration> findInSuperClass(ClassOrInterfaceDeclaration startClass, String methodName, int argCount) {
+        ClassOrInterfaceDeclaration cursor = startClass;
 
-        if (superType == null || JdkKnownTypes.contains(superType)) return Optional.empty();
+        while (true) {
+            String superType = cursor.getExtendedTypes().stream()
+                .findFirst()
+                .map(t -> t.getNameAsString())
+                .orElse(null);
 
-        return projectParser.findCompilationUnit(superType).flatMap(cu -> {
+            if (superType == null || JdkKnownTypes.contains(superType)) return Optional.empty();
+
+            Optional<CompilationUnit> cuOpt = projectParser.findCompilationUnit(superType);
+            if (cuOpt.isEmpty()) return Optional.empty();
+
+            CompilationUnit cu = cuOpt.get();
             injectSolver(cu);
-            return cu.findAll(ClassOrInterfaceDeclaration.class).stream()
+
+            // 1. Try to find method in this superclass
+            Optional<MethodDeclaration> match = cu.findAll(ClassOrInterfaceDeclaration.class).stream()
                 .flatMap(c -> c.getMethodsByName(methodName).stream())
                 .filter(m -> isArityMatch(m, argCount))
                 .findFirst();
-        });
+
+            if (match.isPresent()) return match;
+
+            // 2. Move cursor up to this superclass for next iteration
+            Optional<ClassOrInterfaceDeclaration> nextClass = cu.findFirst(ClassOrInterfaceDeclaration.class,
+                c -> c.getNameAsString().equals(superType));
+
+            if (nextClass.isEmpty()) return Optional.empty();
+            cursor = nextClass.get();
+        }
     }
 
     /**
