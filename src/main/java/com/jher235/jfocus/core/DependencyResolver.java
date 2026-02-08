@@ -178,9 +178,12 @@ public class DependencyResolver {
             CompilationUnit cu = cuOpt.get();
             injectSolver(cu);
 
-            // [Fix 1 Applied Here too] Target specific superclass
+            String targetSuperName = superType.contains(".")
+                ? superType.substring(superType.lastIndexOf('.') + 1)
+                : superType;
+
             Optional<ClassOrInterfaceDeclaration> superClassOpt = cu.findAll(ClassOrInterfaceDeclaration.class).stream()
-                .filter(c -> c.getNameAsString().equals(superType))
+                .filter(c -> c.getNameAsString().equals(targetSuperName))
                 .findFirst();
 
             if (superClassOpt.isEmpty()) return Optional.empty();
