@@ -144,8 +144,12 @@ public class DependencyResolver {
             CompilationUnit cu = cuOpt.get();
             injectSolver(cu);
 
+            String targetClassName = typeName.contains(".") ?
+                typeName.substring(typeName.lastIndexOf('.') + 1) : typeName;
+
             // 6. Find method with Overload Filtering
             return cu.findAll(ClassOrInterfaceDeclaration.class).stream()
+                .filter(c -> c.getNameAsString().equals(targetClassName))
                 .flatMap(c -> c.getMethodsByName(methodName).stream())
                 .filter(m -> isArityMatch(m, argCount))
                 .findFirst();
@@ -174,20 +178,24 @@ public class DependencyResolver {
             CompilationUnit cu = cuOpt.get();
             injectSolver(cu);
 
+            // [Fix 1 Applied Here too] Target specific superclass
+            Optional<ClassOrInterfaceDeclaration> superClassOpt = cu.findAll(ClassOrInterfaceDeclaration.class).stream()
+                .filter(c -> c.getNameAsString().equals(superType))
+                .findFirst();
+
+            if (superClassOpt.isEmpty()) return Optional.empty();
+
+            ClassOrInterfaceDeclaration superClass = superClassOpt.get();
+
             // 1. Try to find method in this superclass
-            Optional<MethodDeclaration> match = cu.findAll(ClassOrInterfaceDeclaration.class).stream()
-                .flatMap(c -> c.getMethodsByName(methodName).stream())
+            Optional<MethodDeclaration> match = superClass.getMethodsByName(methodName).stream()
                 .filter(m -> isArityMatch(m, argCount))
                 .findFirst();
 
             if (match.isPresent()) return match;
 
-            // 2. Move cursor up to this superclass for next iteration
-            Optional<ClassOrInterfaceDeclaration> nextClass = cu.findFirst(ClassOrInterfaceDeclaration.class,
-                c -> c.getNameAsString().equals(superType));
-
-            if (nextClass.isEmpty()) return Optional.empty();
-            cursor = nextClass.get();
+            // 2. Move cursor up
+            cursor = superClass;
         }
     }
 
@@ -276,21 +284,42 @@ public class DependencyResolver {
     public List<FieldDeclaration> resolveFields(MethodDeclaration targetMethod) {
         injectSolver(targetMethod);
         List<FieldDeclaration> dependencies = new ArrayList<>();
-        targetMethod.findAll(NameExpr.class).forEach(expr -> resolveAndAddField(expr, dependencies));
-        targetMethod.findAll(FieldAccessExpr.class).forEach(expr -> resolveAndAddField(expr, dependencies));
+        Set<String> seenFields = new HashSet<>();
+
+        targetMethod.findAll(NameExpr.class).forEach(expr -> resolveAndAddField(expr, dependencies, seenFields));
+        targetMethod.findAll(FieldAccessExpr.class).forEach(expr -> resolveAndAddField(expr, dependencies, seenFields));
         return dependencies;
     }
 
-    private void resolveAndAddField(Resolvable<? extends ResolvedValueDeclaration> expr, List<FieldDeclaration> dependencies) {
+    private void resolveAndAddField(
+        Resolvable<? extends ResolvedValueDeclaration> expr,
+        List<FieldDeclaration> dependencies,
+        Set<String> seenFields
+    ) {
         try {
             ResolvedValueDeclaration resolved = expr.resolve();
             if (resolved instanceof ResolvedFieldDeclaration resolvedField) {
                 if (resolvedField instanceof JavaParserFieldDeclaration) {
                     FieldDeclaration fieldNode = ((JavaParserFieldDeclaration) resolvedField).getWrappedNode();
-                    if (!dependencies.contains(fieldNode)) dependencies.add(fieldNode);
+                    String fieldName = resolvedField.getName();
+
+                    String fieldId = getFieldId(fieldNode, fieldName);
+
+                    if (!seenFields.contains(fieldId)) {
+                        seenFields.add(fieldId);
+                        dependencies.add(fieldNode);
+                    }
                 }
             }
         } catch (Exception e) { /* Ignore */ }
+    }
+
+    // Generate Unique Field ID (ClassName.fieldName)
+    private String getFieldId(FieldDeclaration field, String fieldName) {
+        String owner = field.findAncestor(ClassOrInterfaceDeclaration.class)
+            .flatMap(ClassOrInterfaceDeclaration::getFullyQualifiedName)
+            .orElse("Unknown");
+        return owner + "." + fieldName;
     }
 
     private void injectSolver(Node node) {
