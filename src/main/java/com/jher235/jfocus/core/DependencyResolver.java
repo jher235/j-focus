@@ -9,6 +9,7 @@ import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.FieldAccessExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.NameExpr;
+import com.github.javaparser.ast.nodeTypes.NodeWithName;
 import com.github.javaparser.resolution.Resolvable;
 import com.github.javaparser.resolution.declarations.ResolvedFieldDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
@@ -277,7 +278,7 @@ public class DependencyResolver {
                     .orElse("Unknown");
                 String pkg = md.findCompilationUnit()
                     .flatMap(CompilationUnit::getPackageDeclaration)
-                    .map(pd -> pd.getNameAsString())
+                    .map(NodeWithName::getNameAsString)
                     .orElse("");
                 return pkg.isEmpty() ? className : pkg + "." + className;
             });
