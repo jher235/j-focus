@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class DependencyResolver {
 
@@ -304,9 +305,7 @@ public class DependencyResolver {
             if (resolved instanceof ResolvedFieldDeclaration resolvedField) {
                 if (resolvedField instanceof JavaParserFieldDeclaration) {
                     FieldDeclaration fieldNode = ((JavaParserFieldDeclaration) resolvedField).getWrappedNode();
-                    String fieldName = resolvedField.getName();
-
-                    String fieldId = getFieldId(fieldNode, fieldName);
+                    String fieldId = getFieldId(fieldNode);
 
                     if (!seenFields.contains(fieldId)) {
                         seenFields.add(fieldId);
@@ -317,12 +316,17 @@ public class DependencyResolver {
         } catch (Exception e) { /* Ignore */ }
     }
 
-    // Generate Unique Field ID (ClassName.fieldName)
-    private String getFieldId(FieldDeclaration field, String fieldName) {
-        String owner = field.findAncestor(ClassOrInterfaceDeclaration.class)
-            .flatMap(ClassOrInterfaceDeclaration::getFullyQualifiedName)
+    // Generate Unique Field ID based on the Declaration Node
+    private String getFieldId(FieldDeclaration fd) {
+        String className = fd.findAncestor(ClassOrInterfaceDeclaration.class)
+            .map(c -> c.getFullyQualifiedName().orElse(c.getNameAsString()))
             .orElse("Unknown");
-        return owner + "." + fieldName;
+
+        String fieldNames = fd.getVariables().stream()
+            .map(v -> v.getNameAsString())
+            .collect(Collectors.joining(","));
+
+        return className + "#" + fieldNames;
     }
 
     private void injectSolver(Node node) {
