@@ -22,10 +22,10 @@ class DependencyResolverTest {
 
     @BeforeEach
     void setUp() {
-        resolver = new DependencyResolver();
+        resolver = new DependencyResolver(new ProjectParser());
 
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
-        typeSolver.add(new ReflectionTypeSolver()); // JDK
+        typeSolver.add(new ReflectionTypeSolver());
 
         ParserConfiguration config = new ParserConfiguration();
         config.setSymbolResolver(new JavaSymbolSolver(typeSolver));

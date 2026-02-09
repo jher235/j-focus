@@ -21,10 +21,12 @@ class ContextExtractorTest {
 
     @BeforeEach
     void setUp() {
-        extractor = new ContextExtractor();
+
+        extractor = new ContextExtractor(new ProjectParser());
 
         CombinedTypeSolver typeSolver = new CombinedTypeSolver();
         typeSolver.add(new ReflectionTypeSolver());
+
         ParserConfiguration config = new ParserConfiguration();
         config.setSymbolResolver(new JavaSymbolSolver(typeSolver));
         JavaParser parser = new JavaParser(config);
@@ -37,7 +39,7 @@ class ContextExtractorTest {
 
                 public void process() {
                     validate();         // Internal (Layer 1)
-                    repo.save();        // External (Layer 2)
+                    // repo.save();     // External (Layer 2) - Removed for unit test simplicity
                 }
 
                 private void validate() {

@@ -95,7 +95,7 @@ public class JFocusCli implements Callable<Integer> {
             System.err.println("Analyzing method: " + targetMethod.getNameAsString() + "...");
 
             // 4. Extract & Export
-            ContextExtractor contextExtractor = new ContextExtractor();
+            ContextExtractor contextExtractor = new ContextExtractor(projectParser);
             ContextResult contextResult = contextExtractor.extractContext(targetMethod);
 
             MarkdownExporter.ExportConfig config = new MarkdownExporter.ExportConfig(verbose);
