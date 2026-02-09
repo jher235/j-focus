@@ -26,7 +26,8 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build with Gradle
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          arguments: build shadowJar
+
+      - name: Build with Gradle
+        run: ./gradlew build shadowJar
