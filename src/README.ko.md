@@ -307,7 +307,7 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
  <details>
  <summary><strong>🔎 ContextExtractor.extractContext() 분석 결과 보기</strong></summary>
  
- ```markdown
+ ````markdown
  # Target Method
  The main logic to analyze.
  
@@ -352,6 +352,8 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
  ```
 
 
+
+````
 
 </details>
 

@@ -304,7 +304,7 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
  <details>
  <summary><strong>🔎 View ContextExtractor.extractContext() Analysis Result</strong></summary>
 
- ```markdown
+ ````markdown
  # Target Method
  The main logic to analyze.
 
@@ -348,7 +348,9 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
  private final DependencyResolver dependencyResolver;
  ```
 
- </details>
+ ````
+
+</details>
 
 ---
 
