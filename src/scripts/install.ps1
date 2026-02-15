@@ -54,15 +54,17 @@ Write-Host "⚙️  Generating executable wrapper script..."
 $BatContent = "@echo off`njava -jar ""$DestPath"" %*"
 Set-Content -Path $BatPath -Value $BatContent
 
-# 6. Print Post-Installation Instructions
+# 6. Auto-configure PATH
+Write-Host "⚙️  Configuring PATH..."
+
+$UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if ($UserPath -notlike "*$InstallDir*") {
+    [Environment]::SetEnvironmentVariable("Path", "$UserPath;$InstallDir", "User")
+    Write-Host "✅ Added $InstallDir to User PATH" -ForegroundColor Green
+    Write-Host "🔄 Please restart PowerShell to use the 'jfocus' command." -ForegroundColor Yellow
+} else {
+    Write-Host "ℹ️  PATH already contains $InstallDir" -ForegroundColor Yellow
+}
+
 Write-Host ""
-Write-Host "✅ Installation completed successfully!" -ForegroundColor Green
-Write-Host "📍 Location: $DestPath"
-Write-Host ""
-Write-Host "============================================================" -ForegroundColor Yellow
-Write-Host " 💡 To use the 'jfocus' command globally, add this path:" -ForegroundColor Yellow
-Write-Host "============================================================" -ForegroundColor Yellow
-Write-Host ""
-Write-Host "  Add the following directory to your User PATH environment variable:"
-Write-Host "  $InstallDir"
-Write-Host ""
+Write-Host "✅ Installation completed! After restart, run: jfocus --version" -ForegroundColor Green
