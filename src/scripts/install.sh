@@ -11,7 +11,7 @@ VERSION="1.0.0" # Release version
 JAR_NAME="j-focus-${VERSION}-all.jar"
 INSTALL_DIR="$HOME/.jfocus"
 # Checksum for security (SHA256) - Paste the hash here!
-EXPECTED_SHA256="5bddf71bbcc693fec4be8d4085475b68df93c42926002cb973e591ffb229340d"
+EXPECTED_SHA256="16d7f858f541a9de3e76824e5fec420f767344c08c15dfb6690804153caaaa98"
 
 DOWNLOAD_URL="https://github.com/$REPO/releases/download/v$VERSION/$JAR_NAME"
 
