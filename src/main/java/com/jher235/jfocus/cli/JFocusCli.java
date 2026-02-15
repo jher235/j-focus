@@ -32,10 +32,10 @@ public class JFocusCli implements Callable<Integer> {
     private String fileName;
     @Parameters(index = "1", arity = "0..1", description = "Target method name (Interactive if empty)")
     private String methodName;
-    @Option(names = {"-v", "--verbose"}, description = "Include full source code of external dependencies")
+    @Option(names = { "-v", "--verbose" }, description = "Include full source code of external dependencies")
     private boolean verbose;
-    @Option(names = {"-p", "--print"}, description = "Print to stdout instead of copying to clipboard")
-    private boolean printToConsole;
+    @Option(names = { "-c", "--copy" }, description = "Copy to clipboard instead of stdout")
+    private boolean copyToClipboard;
 
     public static void main(String[] args) {
         int exitCode = new CommandLine(new JFocusCli()).execute(args);
@@ -46,7 +46,6 @@ public class JFocusCli implements Callable<Integer> {
     public Integer call() {
         try {
             // 1. Handle File Input (Interactive)
-
             while (fileName == null || fileName.isEmpty()) {
                 // Use System.err for prompts to avoid polluting stdout during piping
                 System.err.print("Enter file name to search: ");
@@ -90,7 +89,8 @@ public class JFocusCli implements Callable<Integer> {
                 }
             }
 
-            if (targetMethod == null) return 1;
+            if (targetMethod == null)
+                return 1;
 
             System.err.println("Analyzing method: " + targetMethod.getNameAsString() + "...");
 
@@ -104,10 +104,10 @@ public class JFocusCli implements Callable<Integer> {
             String report = exporter.export(contextResult);
 
             // 5. Output Handling
-            if (printToConsole) {
-                System.out.println(report);
-            } else {
+            if (copyToClipboard) {
                 copyToClipboard(report);
+            } else {
+                System.out.println(report);
             }
 
             return 0;
@@ -171,10 +171,12 @@ public class JFocusCli implements Callable<Integer> {
         while (true) {
             System.err.print("\nSelect method number (or 'q' to quit): ");
             String input = scanner.nextLine().trim();
-            if (input.equalsIgnoreCase("q")) return null;
+            if (input.equalsIgnoreCase("q"))
+                return null;
             try {
                 int index = Integer.parseInt(input) - 1;
-                if (index >= 0 && index < methods.size()) return methods.get(index);
+                if (index >= 0 && index < methods.size())
+                    return methods.get(index);
                 System.err.println("Invalid number. Please try again.");
             } catch (NumberFormatException e) {
                 System.err.println("Please enter a number.");
