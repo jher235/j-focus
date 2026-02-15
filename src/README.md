@@ -295,7 +295,7 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
     ```
  3. **Check Result**: Extracted to clipboard if "-c" is used, otherwise printed to screen.
 
- ### 📄 Output Example
+### 📄 Output Example
 
  > The generated markdown is **Safe to paste** directly into ChatGPT or Claude.
 

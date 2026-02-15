@@ -298,7 +298,7 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
     ```
  3. **결과 확인**: "-c" 옵션을 썼다면 클립보드에, 아니면 화면에 결과가 출력됩니다.
  
- ### 📄 출력 결과 예시 (Output Example)
+### 📄 출력 결과 예시 (Output Example)
 
 > 생성된 마크다운은 **ChatGPT나 Claude에 그대로 붙여넣어도 안전합니다.** (Safe to paste)
  
