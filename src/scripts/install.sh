@@ -11,7 +11,7 @@ VERSION="1.0.0" # Release version
 JAR_NAME="j-focus-${VERSION}-all.jar"
 INSTALL_DIR="$HOME/.jfocus"
 # Checksum for security (SHA256) - Paste the hash here!
-EXPECTED_SHA256="5bddf71bbcc693fec4be8d4085475b68df93c42926002cb973e591ffb229340d"
+EXPECTED_SHA256="16d7f858f541a9de3e76824e5fec420f767344c08c15dfb6690804153caaaa98"
 
 DOWNLOAD_URL="https://github.com/$REPO/releases/download/v$VERSION/$JAR_NAME"
 
@@ -64,18 +64,56 @@ fi
 # 5. Set Permissions
 chmod +x "$INSTALL_DIR/j-focus.jar"
 
-# 6. Print Post-Installation Instructions
+# 6. Auto-configure Alias
+echo "⚙️  Configuring alias..."
+
+RC_FILE=""
+# Prioritize $SHELL environment variable for login shell detection
+case "$SHELL" in
+    */zsh) RC_FILE="$HOME/.zshrc" ;;
+    */bash) RC_FILE="$HOME/.bashrc" ;;
+esac
+
+# Fallback detection based on shell version if $SHELL is not conclusive
+if [ -z "$RC_FILE" ]; then
+    if [ -n "$ZSH_VERSION" ]; then
+        RC_FILE="$HOME/.zshrc"
+    elif [ -n "$BASH_VERSION" ]; then
+        RC_FILE="$HOME/.bashrc"
+    fi
+fi
+
+if [ -n "$RC_FILE" ]; then
+    if [ -f "$RC_FILE" ]; then
+        # Check permissions
+        if [ ! -w "$RC_FILE" ]; then
+            echo "⚠️  Warning: No write permission for $RC_FILE. Please add alias manually."
+        else
+            if grep -q "alias jfocus=" "$RC_FILE"; then
+                echo "ℹ️  Alias 'jfocus' already exists in $RC_FILE"
+            else
+                # CREATE BACKUP
+                cp "$RC_FILE" "$RC_FILE.backup-$(date +%Y%m%d)"
+                echo "📦 Created backup: $RC_FILE.backup-$(date +%Y%m%d)"
+
+                echo "" >> "$RC_FILE"
+                echo "# JFocus Alias" >> "$RC_FILE"
+                echo "alias jfocus='java -jar $INSTALL_DIR/j-focus.jar'" >> "$RC_FILE"
+                echo "✅ Added alias to $RC_FILE"
+                echo "🔄 Please restart your terminal or run: source $RC_FILE"
+            fi
+        fi
+    else
+        # File doesn't exist, create it
+        echo "# JFocus Alias" > "$RC_FILE"
+        echo "alias jfocus='java -jar $INSTALL_DIR/j-focus.jar'" >> "$RC_FILE"
+        echo "✅ Created $RC_FILE and added alias"
+        echo "🔄 Please restart your terminal or run: source $RC_FILE"
+    fi
+else
+    echo "⚠️  Could not detect shell configuration file. Please add this manually:"
+    echo "   alias jfocus='java -jar $INSTALL_DIR/j-focus.jar'"
+fi
+
 echo ""
-echo "✅ Installation completed successfully!"
-echo "📍 Location: $INSTALL_DIR/j-focus.jar"
-echo ""
-echo "============================================================"
-echo " 💡 To use the 'jfocus' command globally, add this alias:"
-echo "============================================================"
-echo ""
-echo "  [Bash Users]"
-echo "  echo \"alias jfocus='java -jar $INSTALL_DIR/j-focus.jar'\" >> ~/.bashrc && source ~/.bashrc"
-echo ""
-echo "  [Zsh Users (macOS Default)]"
-echo "  echo \"alias jfocus='java -jar $INSTALL_DIR/j-focus.jar'\" >> ~/.zshrc && source ~/.zshrc"
-echo ""
+echo "✅ Installation completed! Try running: jfocus --version"
