@@ -14,14 +14,14 @@
 
 ## 📝 Table of Contents
 
-- [Introduction](#-introduction)
-- [Benchmarks](#-benchmarks)
-- [Features](#-features)
-- [Installation](#-installation)
-- [Usage](#-usage)
-- [For AI Agents](#-for-ai-agents-cursor-windsurf)
-- [Contributing](#-contributing)
-- [License](#-license)
+- [Introduction](#introduction)
+- [Benchmarks](#benchmarks)
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [For AI Agents](#for-ai-agents-cursor-windsurf)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
