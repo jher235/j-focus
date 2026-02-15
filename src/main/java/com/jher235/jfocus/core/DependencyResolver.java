@@ -1,0 +1,304 @@
+package com.jher235.jfocus.core;
+
+import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.Node;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.FieldDeclaration;
+import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.VariableDeclarator;
+import com.github.javaparser.ast.expr.FieldAccessExpr;
+import com.github.javaparser.ast.expr.MethodCallExpr;
+import com.github.javaparser.ast.expr.NameExpr;
+import com.github.javaparser.resolution.Resolvable;
+import com.github.javaparser.resolution.declarations.ResolvedFieldDeclaration;
+import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
+import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
+import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
+import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
+import com.jher235.jfocus.constant.JdkKnownTypes;
+import com.jher235.jfocus.util.AstUtils;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+public class DependencyResolver {
+
+    private final ProjectParser projectParser;
+
+    public DependencyResolver(ProjectParser projectParser) {
+        this.projectParser = projectParser;
+    }
+
+    public List<MethodDeclaration> resolveMethods(MethodDeclaration targetMethod) {
+        injectSolver(targetMethod);
+
+        List<MethodDeclaration> dependencies = new ArrayList<>();
+        // Track unique method signatures to prevent duplicates from different AST contexts
+        Set<String> seenSignatures = new HashSet<>();
+
+        List<MethodCallExpr> methodCalls = targetMethod.findAll(MethodCallExpr.class);
+
+        for (MethodCallExpr call : methodCalls) {
+            try {
+                // 1. Try Strict Resolution (SymbolSolver)
+                ResolvedMethodDeclaration resolved = call.resolve();
+                if (resolved instanceof JavaParserMethodDeclaration) {
+                    MethodDeclaration methodNode = ((JavaParserMethodDeclaration) resolved).getWrappedNode();
+                    addDependency(dependencies, seenSignatures, targetMethod, methodNode);
+                }
+            } catch (Exception e) {
+                // 2. Fallback: AST-based Type Tracking
+                // Handles cases where symbols (like Mono) are missing or strict resolution fails
+                resolveByAstAnalysis(targetMethod, call).ifPresent(methodNode ->
+                    addDependency(dependencies, seenSignatures, targetMethod, methodNode));
+            }
+        }
+        return dependencies;
+    }
+
+    /**
+     * Finds the method declaration by analyzing the AST structure.
+     * Traces variable types from Fields, Parameters, and Local Variables.
+     * Handles unscoped calls (implicit this), explicit scopes (this., super.), and method overloading.
+     */
+    private Optional<MethodDeclaration> resolveByAstAnalysis(MethodDeclaration contextMethod, MethodCallExpr call) {
+        String methodName = call.getNameAsString();
+        int argCount = call.getArguments().size();
+
+        // 1. Find the class containing the method
+        ClassOrInterfaceDeclaration currentClass = contextMethod.findAncestor(ClassOrInterfaceDeclaration.class).orElse(null);
+        if (currentClass == null) return Optional.empty();
+
+        // 2. Handle Unscoped Calls (e.g., internalMethod()) -> Implicit 'this'
+        if (call.getScope().isEmpty()) {
+            Optional<MethodDeclaration> local = currentClass.getMethodsByName(methodName).stream()
+                .filter(m -> isArityMatch(m, argCount))
+                .findFirst();
+            if (local.isPresent()) return local;
+
+            return findInSuperClass(currentClass, methodName, argCount);
+        }
+
+        String rawScope = call.getScope().get().toString(); // e.g., "user", "this.repository"
+        String variableName = rawScope;
+
+        boolean explicitThis = "this".equals(rawScope) || rawScope.startsWith("this.");
+        boolean explicitSuper = "super".equals(rawScope) || rawScope.startsWith("super.");
+
+        // 3. Normalize Scope (Strip this./super.)
+        if (variableName.contains(".")) {
+            if (explicitThis || explicitSuper) {
+                variableName = variableName.substring(variableName.indexOf('.') + 1);
+            } else {
+                return Optional.empty(); // Ignore complex chains
+            }
+        }
+
+        // 4. Resolve Variable Type
+        String typeName = null;
+
+        if (explicitThis) {
+            // Case: this.method() -> Resolve directly within current class (including inheritance)
+            if ("this".equals(rawScope)) {
+                Optional<MethodDeclaration> local = currentClass.getMethodsByName(methodName).stream()
+                    .filter(m -> isArityMatch(m, argCount))
+                    .findFirst();
+                if (local.isPresent()) return local;
+
+                return findInSuperClass(currentClass, methodName, argCount);
+            }
+            // Case: this.field.method() -> Find field strictly
+            else {
+                typeName = findFieldType(currentClass, variableName);
+            }
+        } else if (explicitSuper) {
+            // Case: super.method() -> Type is Parent Class (Start traversal from parent)
+            if ("super".equals(rawScope)) {
+                return findInSuperClass(currentClass, methodName, argCount);
+            }
+            // Case: super.field.method() -> Not supported in fallback
+            else {
+                return Optional.empty();
+            }
+        } else {
+            // Case: variable.method() -> Priority: Local -> Param -> Field
+            typeName = findLocalVariableType(contextMethod, variableName);
+            if (typeName == null) typeName = findParameterType(contextMethod, variableName);
+            if (typeName == null) typeName = findFieldType(currentClass, variableName);
+        }
+
+        if (typeName == null) return Optional.empty();
+
+        // Strip generics
+        if (typeName.contains("<")) {
+            typeName = typeName.substring(0, typeName.indexOf("<")).trim();
+        }
+
+        if (JdkKnownTypes.contains(typeName)) return Optional.empty();
+
+        // 5. Search for the file corresponding to the type name
+        Optional<CompilationUnit> cuOpt = projectParser.findCompilationUnit(typeName);
+
+        if (cuOpt.isPresent()) {
+            CompilationUnit cu = cuOpt.get();
+            injectSolver(cu);
+
+            String targetClassName = typeName.contains(".") ?
+                typeName.substring(typeName.lastIndexOf('.') + 1) : typeName;
+
+            // 6. Find method with Overload Filtering
+            return cu.findAll(ClassOrInterfaceDeclaration.class).stream()
+                .filter(c -> c.getNameAsString().equals(targetClassName))
+                .flatMap(c -> c.getMethodsByName(methodName).stream())
+                .filter(m -> isArityMatch(m, argCount))
+                .findFirst();
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Traverses the FULL superclass chain to find a method by name and arity.
+     */
+    private Optional<MethodDeclaration> findInSuperClass(ClassOrInterfaceDeclaration startClass, String methodName, int argCount) {
+        ClassOrInterfaceDeclaration cursor = startClass;
+
+        while (true) {
+            String superType = cursor.getExtendedTypes().stream()
+                .findFirst()
+                .map(t -> t.getNameAsString())
+                .orElse(null);
+
+            if (superType == null || JdkKnownTypes.contains(superType)) return Optional.empty();
+
+            Optional<CompilationUnit> cuOpt = projectParser.findCompilationUnit(superType);
+            if (cuOpt.isEmpty()) return Optional.empty();
+
+            CompilationUnit cu = cuOpt.get();
+            injectSolver(cu);
+
+            String targetSuperName = superType.contains(".")
+                ? superType.substring(superType.lastIndexOf('.') + 1)
+                : superType;
+
+            Optional<ClassOrInterfaceDeclaration> superClassOpt = cu.findAll(ClassOrInterfaceDeclaration.class).stream()
+                .filter(c -> c.getNameAsString().equals(targetSuperName))
+                .findFirst();
+
+            if (superClassOpt.isEmpty()) return Optional.empty();
+
+            ClassOrInterfaceDeclaration superClass = superClassOpt.get();
+
+            // 1. Try to find method in this superclass
+            Optional<MethodDeclaration> match = superClass.getMethodsByName(methodName).stream()
+                .filter(m -> isArityMatch(m, argCount))
+                .findFirst();
+
+            if (match.isPresent()) return match;
+
+            // 2. Move cursor up
+            cursor = superClass;
+        }
+    }
+
+    /**
+     * Helper to check if method parameters match the argument count (handling varargs).
+     */
+    private boolean isArityMatch(MethodDeclaration method, int argCount) {
+        int paramCount = method.getParameters().size();
+
+        if (paramCount == argCount) return true;
+
+        // Handle VarArgs (e.g., String... args)
+        if (paramCount > 0 && method.getParameter(paramCount - 1).isVarArgs()) {
+            // VarArgs allows argCount >= paramCount - 1
+            return argCount >= (paramCount - 1);
+        }
+
+        return false;
+    }
+
+    /**
+     * Scans for local variable declarations inside the method body.
+     * e.g., User user = ...;
+     */
+    private String findLocalVariableType(MethodDeclaration method, String variableName) {
+        return method.findAll(VariableDeclarator.class).stream()
+            .filter(v -> v.getNameAsString().equals(variableName))
+            .map(v -> v.getType().asString())
+            .findFirst()
+            .orElse(null);
+    }
+
+    private String findFieldType(ClassOrInterfaceDeclaration clazz, String variableName) {
+        for (FieldDeclaration field : clazz.getFields()) {
+            for (VariableDeclarator variable : field.getVariables()) {
+                if (variable.getNameAsString().equals(variableName)) {
+                    return variable.getType().asString();
+                }
+            }
+        }
+        return null;
+    }
+
+    private String findParameterType(MethodDeclaration method, String variableName) {
+        return method.getParameters().stream()
+            .filter(p -> p.getNameAsString().equals(variableName))
+            .map(p -> p.getType().asString())
+            .findFirst()
+            .orElse(null);
+    }
+
+    private void addDependency(List<MethodDeclaration> dependencies, Set<String> seen, MethodDeclaration target, MethodDeclaration found) {
+        injectSolver(found);
+
+        String methodId = AstUtils.createMethodId(found);
+
+        // Avoid self-reference and duplicates
+        if (!found.equals(target) && !seen.contains(methodId)) {
+            seen.add(methodId);
+            dependencies.add(found);
+        }
+    }
+
+    public List<FieldDeclaration> resolveFields(MethodDeclaration targetMethod) {
+        injectSolver(targetMethod);
+        List<FieldDeclaration> dependencies = new ArrayList<>();
+        Set<String> seenFields = new HashSet<>();
+
+        targetMethod.findAll(NameExpr.class).forEach(expr -> resolveAndAddField(expr, dependencies, seenFields));
+        targetMethod.findAll(FieldAccessExpr.class).forEach(expr -> resolveAndAddField(expr, dependencies, seenFields));
+        return dependencies;
+    }
+
+    private void resolveAndAddField(
+        Resolvable<? extends ResolvedValueDeclaration> expr,
+        List<FieldDeclaration> dependencies,
+        Set<String> seenFields
+    ) {
+        try {
+            ResolvedValueDeclaration resolved = expr.resolve();
+            if (resolved instanceof ResolvedFieldDeclaration resolvedField) {
+                if (resolvedField instanceof JavaParserFieldDeclaration) {
+                    FieldDeclaration fieldNode = ((JavaParserFieldDeclaration) resolvedField).getWrappedNode();
+                    String fieldId = AstUtils.createFieldId(fieldNode);
+
+                    if (!seenFields.contains(fieldId)) {
+                        seenFields.add(fieldId);
+                        dependencies.add(fieldNode);
+                    }
+                }
+            }
+        } catch (Exception e) { /* Ignore */ }
+    }
+
+    private void injectSolver(Node node) {
+        node.findCompilationUnit().ifPresent(cu -> {
+            if (!cu.containsData(Node.SYMBOL_RESOLVER_KEY)) {
+                cu.setData(Node.SYMBOL_RESOLVER_KEY, projectParser.getSymbolSolver());
+            }
+        });
+    }
+}

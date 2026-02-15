@@ -1,0 +1,37 @@
+# CodeRabbit config file
+# docs: https://docs.coderabbit.ai/guides/configure-coderabbit
+
+early_access: true
+
+reviews:
+  profile: assertive
+  high_level_summary: true
+  incremental_review: true
+  review_status: true
+  collapse_walkthrough: true
+
+  poem: false
+  request_changes_workflow: false
+
+  auto_review:
+    enabled: true
+    drafts: true
+    base_branches:
+      - develop
+      - main
+
+  # excluded files
+  path_filters:
+    - "!*.md"
+    - "!.github/**"
+    - "!gradle/**"
+    - "!build/**"
+    - "!.idea/**"
+    - "!*.iml"
+
+chat:
+  auto_reply: true
+
+issue_enrichment:
+  auto_enrich:
+    enabled: false
