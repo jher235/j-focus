@@ -14,19 +14,19 @@
 
 ## 📝 목차
 
-- [소개](#소개-introduction)
-- [효과 (Benchmarks)](#효과-benchmarks)
-- [주요 기능](#주요-기능-features)
-- [설치 방법](#설치-방법-installation)
-- [사용 방법](#사용-방법-usage)
+- [소개](#introduction)
+- [효과 (Benchmarks)](#benchmarks)
+- [주요 기능](#features)
+- [설치 방법](#installation)
+- [사용 방법](#usage)
 - [For AI Agents](#for-ai-agents-cursor-windsurf)
-- [기여하기](#기여하기-contributing)
-- [라이선스](#라이선스-license)
+- [기여하기](#contributing)
+- [라이선스](#license)
 
 ---
 
-## 💡 소개 (Introduction)
-![JFocus CLI Demo](src/docs/images/demo.png)
+## <a id="introduction"></a>💡 소개 (Introduction)
+![JFocus CLI Demo](docs/images/demo.png)
 
 대규모 자바 프로젝트를 개발하거나 분석할 때, LLM에게 코드를 이해시키기 위해 전체 파일을 복사해 붙여넣는 것은 비효율적입니다. 토큰 제한에 걸리거나, 불필요한 정보로 인해 LLM의 답변 품질이 떨어질 수 있습니다.
 
@@ -57,7 +57,7 @@
 
 ---
 
-## 📊 효과 (Benchmarks)
+## <a id="benchmarks"></a>📊 효과 (Benchmarks)
 
 `jfocus`는 LLM 에이전트의 컨텍스트 사용량을 획기적으로 최적화합니다. 타겟 메서드의 로직과 참조된 의존성의 서명(Signature)만 추출하여, 토큰 소비를 최소화하면서도 코드 이해에 필요한 충분한 문맥을 유지합니다.
 
@@ -93,7 +93,7 @@
 
 ---
 
-## ✨ 주요 기능 (Features)
+## <a id="features"></a>✨ 주요 기능 (Features)
 
 - **🎯 정밀한 문맥 추출**: 
   - 메서드 내부에서 호출되는 다른 메서드, 필드 변수, 상속 구조 등을 재귀적으로 분석하지 않고, **직접적인 연관성**을 파악하여 핵심 정보만 제공합니다.
@@ -111,7 +111,7 @@
 
 ---
 
-## 📦 설치 방법 (Installation)
+## <a id="installation"></a>📦 설치 방법 (Installation)
 
 ### 사전 준비
 
@@ -247,7 +247,7 @@ alias jfocus-dev='java -jar ~/projects/j-focus/build/libs/j-focus-*-all.jar'
 
 ---
 
-## 🎮 사용 방법 (Usage)
+## <a id="usage"></a>🎮 사용 방법 (Usage)
 
 ### 기본 실행
 설치가 완료되면 `jfocus` 명령어로 어디서든 실행할 수 있습니다. 파일명이나 메서드명을 인자로 주지 않으면 **대화형 모드**가 시작됩니다.
@@ -359,14 +359,14 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
 
 ---
 
-## 🤖 For AI Agents (Cursor, Windsurf)
+## <a id="for-ai-agents-cursor-windsurf"></a>🤖 For AI Agents (Cursor, Windsurf)
 
 **JFocus**는 AI 에이전트(Cursor, Windsurf)와 결합했을 때 가장 강력합니다. 매번 프롬프트를 입력할 필요 없이, 프로젝트 설정 파일에 규칙을 추가하여 **에이전트가 스스로 도구를 사용하도록** 만드세요.
 
 
 ### 1. 에이전트 규칙 설정 (Configure Agent Rules)
 
-프로젝트 루트의 에이전트 설정 파일(예: `.cursorrules`, `.windsurfrules` 등)에 [src/main/java/com/jher235/jfocus/docs/rules.md](src/main/java/com/jher235/jfocus/docs/rules.md) 파일의 내용을 복사해 붙여넣으세요.
+프로젝트 루트의 에이전트 설정 파일(예: `.cursorrules`, `.windsurfrules` 등)에 [docs/rules.md](docs/rules.md) 파일의 내용을 복사해 붙여넣으세요.
 
 ### 2. 사용 예시
 
@@ -378,7 +378,7 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
 
 ---
 
-## 🤝 기여하기 (Contributing)
+## <a id="contributing"></a>🤝 기여하기 (Contributing)
 
 이 프로젝트는 오픈 소스이며, 여러분의 기여를 환영합니다! 🎉
 
@@ -388,10 +388,10 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
 4. 브랜치에 푸시하세요 (`git push origin feature/amazing-feature`).
 5. **Pull Request**를 열어주세요.
 
-버그 제보나 기능 제안은 [Issues](https://github.com/jher235/jfocus/issues) 탭을 이용해 주세요.
+버그 제보나 기능 제안은 [Issues](https://github.com/jher235/j-focus/issues) 탭을 이용해 주세요.
 
 ---
 
-## 📜 라이선스 (License)
+## <a id="license"></a>📜 라이선스 (License)
 
 이 프로젝트는 **MIT License**에 따라 배포됩니다. 자세한 내용은 `LICENSE` 파일을 참고하세요.

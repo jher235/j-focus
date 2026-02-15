@@ -25,8 +25,8 @@
 
 ---
 
-## 💡 Introduction
-![JFocus CLI Demo](src/docs/images/demo.png)
+## <a id="introduction"></a>💡 Introduction
+![JFocus CLI Demo](docs/images/demo.png)
 
 When developing or analyzing large-scale Java projects, copy-pasting entire files to help LLMs understand code is inefficient. It hits token limits and degrades response quality with unnecessary noise.
 
@@ -57,7 +57,7 @@ Text-based searches fail to distinguish method overloading, inner classes, or me
 
 ---
 
-## 📊 Benchmarks
+## <a id="benchmarks"></a>📊 Benchmarks
 
 `jfocus` drastically optimizes context usage for LLM agents. By extracting only the target method's logic and the signatures of referenced dependencies, it minimizes token consumption while maintaining sufficient context for code understanding.
 
@@ -93,7 +93,7 @@ Yes, it is supported, but it is optimized for **Single Module** or **Monolithic*
 
 ---
 
-## ✨ Features
+## <a id="features"></a>✨ Features
 
 - **🎯 Precise Context Extraction**: 
   - Determines **direct relevance** and provides core information without recursively analyzing methods called within methods, field variables, or inheritance structures.
@@ -111,7 +111,7 @@ Yes, it is supported, but it is optimized for **Single Module** or **Monolithic*
 
 ---
 
-## 📦 Installation
+## <a id="installation"></a>📦 Installation
 
 ### Prerequisites
 
@@ -244,7 +244,7 @@ alias jfocus-dev='java -jar ~/projects/j-focus/build/libs/j-focus-*-all.jar'
 
 ---
 
-## 🎮 Usage
+## <a id="usage"></a>🎮 Usage
 
 ### Basic Execution
 Once installed, you can run `jfocus` from anywhere. If no filename or method name is provided, **Interactive Mode** starts.
@@ -354,14 +354,13 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
 
 ---
 
-## 🤖 For AI Agents (Cursor, Windsurf)
+## <a id="for-ai-agents-cursor-windsurf"></a>🤖 For AI Agents (Cursor, Windsurf)
 
 **JFocus** is most powerful when combined with AI Agents (Cursor, Windsurf). Instead of typing prompts every time, add rules to your project configuration to make the **Agent use the tool autonomously**.
 
-
 ### 1. Configure Agent Rules
 
-Copy and paste the content of [src/main/java/com/jher235/jfocus/docs/rules.md](src/main/java/com/jher235/jfocus/docs/rules.md) into your agent's configuration file (e.g., `.cursorrules`, `.windsurfrules`, or `.instructions`) at your project root.
+Copy and paste the content of [docs/rules.md](docs/rules.md) into your agent's configuration file (e.g., `.cursorrules`, `.windsurfrules`, or `.instructions`) at your project root.
 
 ### 2. Usage
 
@@ -373,7 +372,7 @@ The agent will automatically run `jfocus`, grasp the context, and provide an acc
 
 ---
 
-## 🤝 Contributing
+## <a id="contributing"></a>🤝 Contributing
 
 This project is open source and contributions are welcome! 🎉
 
@@ -383,10 +382,10 @@ This project is open source and contributions are welcome! 🎉
 4. Push to the branch (`git push origin feature/amazing-feature`).
 5. Open a **Pull Request**.
 
-Please use the [Issues](https://github.com/jher235/jfocus/issues) tab for bug reports or feature suggestions.
+Please use the [Issues](https://github.com/jher235/j-focus/issues) tab for bug reports or feature suggestions.
 
 ---
 
-## 📜 License
+## <a id="license"></a>📜 License
 
 This project is distributed under the **MIT License**. See `LICENSE` file for details.
