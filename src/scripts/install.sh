@@ -68,16 +68,19 @@ chmod +x "$INSTALL_DIR/j-focus.jar"
 echo "⚙️  Configuring alias..."
 
 RC_FILE=""
-if [ -n "$ZSH_VERSION" ]; then
-    RC_FILE="$HOME/.zshrc"
-elif [ -n "$BASH_VERSION" ]; then
-    RC_FILE="$HOME/.bashrc"
-else
-    # Fallback detection
-    case "$SHELL" in
-        */zsh) RC_FILE="$HOME/.zshrc" ;;
-        */bash) RC_FILE="$HOME/.bashrc" ;;
-    esac
+# Prioritize $SHELL environment variable for login shell detection
+case "$SHELL" in
+    */zsh) RC_FILE="$HOME/.zshrc" ;;
+    */bash) RC_FILE="$HOME/.bashrc" ;;
+esac
+
+# Fallback detection based on shell version if $SHELL is not conclusive
+if [ -z "$RC_FILE" ]; then
+    if [ -n "$ZSH_VERSION" ]; then
+        RC_FILE="$HOME/.zshrc"
+    elif [ -n "$BASH_VERSION" ]; then
+        RC_FILE="$HOME/.bashrc"
+    fi
 fi
 
 if [ -n "$RC_FILE" ]; then
