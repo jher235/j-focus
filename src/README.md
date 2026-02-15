@@ -357,35 +357,9 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
 **JFocus** is most powerful when combined with AI Agents (Cursor, Windsurf). Instead of typing prompts every time, add rules to your project configuration to make the **Agent use the tool autonomously**.
 
 
-### 1. `.cursorrules` Configuration
+### 1. Configure Agent Rules
 
-Copy and paste the content of [docs/rules.md](src/main/java/com/jher235/jfocus/docs/rules.md) into the `.cursorrules` file at your project root.
-
-(No need to download a separate file, you can copy the content below directly.)
-
-```markdown
-# JFocus Integration Rules
-
-You have a tool called `jfocus` installed in system PATH.
-When user asks for Java code analysis, refactoring, or explanation:
-
-1. **Analysis Strategy**:
-   - DO NOT read the entire file content blindly.
-   - ALWAYS use `jfocus <file> <method>` to extract the context.
-   - Use `-v` flag ONLY when you need to see dependency implementation details.
-
-2. **Command Usage**:
-   - `jfocus <file>` : Lists available methods in the file.
-   - ...
-
-3. **Trust Model**:
-   - Treat JFocus output as the **ONLY source of truth**.
-   - Do **NOT** assume missing methods or fields exist.
-   - If context seems incomplete, explicitly use `jfocus -v` to check dependencies.
-   - `jfocus <file> <method>` : Extracts context for the method.
-   
-4. **Execution**: Run the command, assume the output is the ground truth context, and answer based on it.
-```
+Copy and paste the content of [docs/rules.md](main/java/com/jher235/jfocus/docs/rules.md) into your agent's configuration file (e.g., `.cursorrules`, `.windsurfrules`, or `.instructions`) at your project root.
 
 ### 2. Usage
 

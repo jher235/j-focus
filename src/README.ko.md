@@ -362,35 +362,9 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
 **JFocus**는 AI 에이전트(Cursor, Windsurf)와 결합했을 때 가장 강력합니다. 매번 프롬프트를 입력할 필요 없이, 프로젝트 설정 파일에 규칙을 추가하여 **에이전트가 스스로 도구를 사용하도록** 만드세요.
 
 
-### 1. `.cursorrules` 설정
+### 1. 에이전트 규칙 설정 (Configure Agent Rules)
 
-프로젝트 루트의 `.cursorrules` 파일에 [docs/rules.md](src/main/java/com/jher235/jfocus/docs/rules.md) 파일의 내용을 복사해 붙여넣으세요.
-
-(별도 파일을 다운로드할 필요 없이, 아래 내용을 그대로 복사하셔도 됩니다.)
-
-```markdown
-# JFocus Integration Rules
-
-You have a tool called `jfocus` installed in system PATH.
-When user asks for Java code analysis, refactoring, or explanation:
-
-1. **Analysis Strategy**:
-   - DO NOT read the entire file content blindly.
-   - ALWAYS use `jfocus <file> <method>` to extract the context.
-   - Use `-v` flag ONLY when you need to see dependency implementation details.
-
-2. **Command Usage**:
-   - `jfocus <file>` : Lists available methods in the file.
-   - ...
-
-3. **Trust Model**:
-   - Treat JFocus output as the **ONLY source of truth**.
-   - Do **NOT** assume missing methods or fields exist.
-   - If context seems incomplete, explicitly use `jfocus -v` to check dependencies.
-   - `jfocus <file> <method>` : Extracts context for the method.
-   
-4. **Execution**: Run the command, assume the output is the ground truth context, and answer based on it.
-```
+프로젝트 루트의 에이전트 설정 파일(예: `.cursorrules`, `.windsurfrules` 등)에 [docs/rules.md](main/java/com/jher235/jfocus/docs/rules.md) 파일의 내용을 복사해 붙여넣으세요.
 
 ### 2. 사용 예시
 

@@ -12,4 +12,9 @@ When user asks for Java code analysis, refactoring, or explanation:
    - `jfocus <file>` : Lists available methods in the file.
    - `jfocus <file> <method>` : Extracts context for the method.
 
-3. **Execution**: Run the command, assume the output is the ground truth context, and answer based on it.
+3. **Trust Model**:
+   - Treat JFocus output as the **ONLY source of truth**.
+   - Do **NOT** assume missing methods or fields exist.
+   - If context seems incomplete, explicitly use `jfocus -v` to check dependencies.
+
+4. **Execution**: Run the command, assume the output is the ground truth context, and answer based on it.
