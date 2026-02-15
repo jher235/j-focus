@@ -26,7 +26,7 @@
 ---
 
 ## 💡 소개 (Introduction)
-![JFocus CLI Demo](docs/images/demo.png)
+![JFocus CLI Demo](src/docs/images/demo.png)
 
 대규모 자바 프로젝트를 개발하거나 분석할 때, LLM에게 코드를 이해시키기 위해 전체 파일을 복사해 붙여넣는 것은 비효율적입니다. 토큰 제한에 걸리거나, 불필요한 정보로 인해 LLM의 답변 품질이 떨어질 수 있습니다.
 
@@ -366,7 +366,7 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
 
 ### 1. 에이전트 규칙 설정 (Configure Agent Rules)
 
-프로젝트 루트의 에이전트 설정 파일(예: `.cursorrules`, `.windsurfrules` 등)에 [docs/rules.md](main/java/com/jher235/jfocus/docs/rules.md) 파일의 내용을 복사해 붙여넣으세요.
+프로젝트 루트의 에이전트 설정 파일(예: `.cursorrules`, `.windsurfrules` 등)에 [src/main/java/com/jher235/jfocus/docs/rules.md](src/main/java/com/jher235/jfocus/docs/rules.md) 파일의 내용을 복사해 붙여넣으세요.
 
 ### 2. 사용 예시
 

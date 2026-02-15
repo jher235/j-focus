@@ -26,7 +26,7 @@
 ---
 
 ## 💡 Introduction
-![JFocus CLI Demo](docs/images/demo.png)
+![JFocus CLI Demo](src/docs/images/demo.png)
 
 When developing or analyzing large-scale Java projects, copy-pasting entire files to help LLMs understand code is inefficient. It hits token limits and degrades response quality with unnecessary noise.
 
@@ -361,7 +361,7 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
 
 ### 1. Configure Agent Rules
 
-Copy and paste the content of [docs/rules.md](main/java/com/jher235/jfocus/docs/rules.md) into your agent's configuration file (e.g., `.cursorrules`, `.windsurfrules`, or `.instructions`) at your project root.
+Copy and paste the content of [src/main/java/com/jher235/jfocus/docs/rules.md](src/main/java/com/jher235/jfocus/docs/rules.md) into your agent's configuration file (e.g., `.cursorrules`, `.windsurfrules`, or `.instructions`) at your project root.
 
 ### 2. Usage
 
