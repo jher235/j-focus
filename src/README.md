@@ -144,7 +144,7 @@ curl -sL https://raw.githubusercontent.com/jher235/j-focus/main/scripts/install.
 
 #### Windows (PowerShell)
 
-Can be executed without administrator privileges. Automatically sets environment variables (PATH) after installation.
+This script can be executed without administrator privileges. Automatically sets environment variables (PATH) after installation.
 
 ```powershell
 iwr -useb https://raw.githubusercontent.com/jher235/j-focus/main/scripts/install.ps1 | iex

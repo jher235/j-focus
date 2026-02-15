@@ -14,14 +14,14 @@
 
 ## 📝 목차
 
-- [소개](#-소개)
-- [효과 (Benchmarks)](#-효과-benchmarks)
-- [주요 기능](#-주요-기능)
-- [설치 방법](#-설치-방법)
-- [사용 방법](#-사용-방법)
-- [For AI Agents](#-for-ai-agents-cursor-windsurf)
-- [기여하기](#-기여하기)
-- [라이선스](#-라이선스)
+- [소개](#소개-introduction)
+- [효과 (Benchmarks)](#효과-benchmarks)
+- [주요 기능](#주요-기능-features)
+- [설치 방법](#설치-방법-installation)
+- [사용 방법](#사용-방법-usage)
+- [For AI Agents](#for-ai-agents-cursor-windsurf)
+- [기여하기](#기여하기-contributing)
+- [라이선스](#라이선스-license)
 
 ---
 
