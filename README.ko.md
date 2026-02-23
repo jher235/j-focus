@@ -139,7 +139,7 @@ java -version  # Java 21 이상인지 확인
 
 ```bash
 # ⚠️ 보안이 우려된다면 실행 전 스크립트 내용을 확인하세요.
-curl -sL https://raw.githubusercontent.com/jher235/j-focus/main/scripts/install.sh | bash
+curl -sL https://raw.githubusercontent.com/jher235/j-focus/develop/scripts/install.sh | bash
 ```
 
 #### Windows (PowerShell)
@@ -147,7 +147,7 @@ curl -sL https://raw.githubusercontent.com/jher235/j-focus/main/scripts/install.
 관리자 권한 없이도 실행 가능합니다. 설치 후 환경 변수(PATH)까지 자동으로 설정합니다.
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/jher235/j-focus/main/scripts/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/jher235/j-focus/develop/scripts/install.ps1 | iex
 ```
 
 ---
