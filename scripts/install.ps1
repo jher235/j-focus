@@ -10,7 +10,7 @@ $Version = "1.0.0" # Release version
 $JarName = "j-focus-$Version-all.jar"
 $InstallDir = "$HOME\.jfocus"
 # Checksum for security (SHA256) - Paste the hash from Step 1 here!
-$ExpectedSha256 = "ab3c3e429e96460f1045986d69e42e7e6a85d31451ae658464129a8efcf00abd"
+$ExpectedSha256 = "64d38039c8731215635e8bc609ff95b9e0bc7c7309fb13361e27a7605cbed923"
 
 $DownloadUrl = "https://github.com/$Repo/releases/download/v$Version/$JarName"
 $DestPath = "$InstallDir\j-focus.jar"
