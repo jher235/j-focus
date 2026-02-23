@@ -12,7 +12,8 @@ import java.util.Set;
  * Orchestrates the extraction of code context.
  * It uses DependencyResolver to find related nodes and categorizes them
  * into internal (same class) and external (other classes) layers.
- * Supports recursive analysis to capture the full call chain within the project.
+ * Supports recursive analysis to capture the full call chain within the
+ * project.
  */
 public class ContextExtractor {
 
@@ -23,12 +24,27 @@ public class ContextExtractor {
     }
 
     /**
-     * Extracts the full context for the given target method recursively.
+     * Extracts the shallow context for the given target method (direct calls only).
+     * Equivalent to {@code extractContext(targetMethod, false)}.
      *
      * @param targetMethod The method to analyze
      * @return Categorized context (target + internal + external + fields)
      */
     public ContextResult extractContext(MethodDeclaration targetMethod) {
+        return extractContext(targetMethod, false);
+    }
+
+    /**
+     * Extracts the context for the given target method.
+     *
+     * @param targetMethod The method to analyze
+     * @param verbose      if true, recursively traverses all dependencies (deep
+     *                     mode);
+     *                     if false, only collects direct (1-depth) calls (shallow
+     *                     mode).
+     * @return Categorized context (target + internal + external + fields)
+     */
+    public ContextResult extractContext(MethodDeclaration targetMethod, boolean verbose) {
         ContextResult result = new ContextResult(targetMethod);
 
         // Fields
@@ -38,25 +54,31 @@ public class ContextExtractor {
         Set<String> visited = new HashSet<>();
         visited.add(AstUtils.createMethodId(targetMethod));
 
-        // Start recursive analysis
-        extractRecursive(targetMethod, targetMethod, result, visited);
+        // Start recursive analysis based on verbose flag
+        extractRecursive(targetMethod, targetMethod, result, visited, verbose);
 
         return result;
     }
 
     /**
-     * Recursively traverses method calls to find all related user code.
-     * External libraries are automatically excluded as they lack source code definitions.
+     * Traverses method calls to collect related user code.
+     * External libraries are automatically excluded as they lack source code
+     * definitions.
+     *
+     * @param verbose if false, stops after the first level of calls (no further
+     *                recursion).
+     *                if true, recursively follows all dependencies.
      */
     private void extractRecursive(MethodDeclaration rootTarget,
-        MethodDeclaration currentMethod,
-        ContextResult result,
-        Set<String> visited) {
+            MethodDeclaration currentMethod,
+            ContextResult result,
+            Set<String> visited,
+            boolean verbose) {
 
         List<MethodDeclaration> dependencies = dependencyResolver.resolveMethods(currentMethod);
 
         ClassOrInterfaceDeclaration rootClass = rootTarget.findAncestor(ClassOrInterfaceDeclaration.class)
-            .orElse(null);
+                .orElse(null);
 
         for (MethodDeclaration dep : dependencies) {
             String depId = AstUtils.createMethodId(dep);
@@ -69,7 +91,7 @@ public class ContextExtractor {
             visited.add(depId);
 
             ClassOrInterfaceDeclaration depClass = dep.findAncestor(ClassOrInterfaceDeclaration.class)
-                .orElse(null);
+                    .orElse(null);
 
             // Categorize into Internal (same class) vs External (different class)
             if (rootClass != null && rootClass.equals(depClass)) {
@@ -78,8 +100,10 @@ public class ContextExtractor {
                 result.addExternalMethod(dep);
             }
 
-            // Continue recursion to find deeper dependencies
-            extractRecursive(rootTarget, dep, result, visited);
+            // In verbose mode, recurse further to capture deeper dependencies
+            if (verbose) {
+                extractRecursive(rootTarget, dep, result, visited, verbose);
+            }
         }
     }
 

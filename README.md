@@ -139,7 +139,7 @@ Automatically registers Alias for `jfocus` command along with installation.
 
 ```bash
 # ⚠️ Review the install script before piping to bash if you have security concerns.
-curl -sL https://raw.githubusercontent.com/jher235/j-focus/main/scripts/install.sh | bash
+curl -sL https://raw.githubusercontent.com/jher235/j-focus/develop/scripts/install.sh | bash
 ```
 
 #### Windows (PowerShell)
@@ -147,7 +147,7 @@ curl -sL https://raw.githubusercontent.com/jher235/j-focus/main/scripts/install.
 This script can be executed without administrator privileges. Automatically sets environment variables (PATH) after installation.
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/jher235/j-focus/main/scripts/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/jher235/j-focus/develop/scripts/install.ps1 | iex
 ```
 
 ---
