@@ -12,7 +12,8 @@ import java.util.Set;
  * Orchestrates the extraction of code context.
  * It uses DependencyResolver to find related nodes and categorizes them
  * into internal (same class) and external (other classes) layers.
- * Supports recursive analysis to capture the full call chain within the project.
+ * Supports recursive analysis to capture the full call chain within the
+ * project.
  */
 public class ContextExtractor {
 
@@ -28,7 +29,18 @@ public class ContextExtractor {
      * @param targetMethod The method to analyze
      * @return Categorized context (target + internal + external + fields)
      */
+    // Backward-compatible default: non-verbose (shallow)
     public ContextResult extractContext(MethodDeclaration targetMethod) {
+        return extractContext(targetMethod, false);
+    }
+
+    /**
+     * @param verbose if true, recursively traverses internal methods to collect
+     *                their external calls as well (deep mode).
+     *                if false, only collects direct (1-depth) calls of the target
+     *                method (shallow mode).
+     */
+    public ContextResult extractContext(MethodDeclaration targetMethod, boolean verbose) {
         ContextResult result = new ContextResult(targetMethod);
 
         // Fields
@@ -38,25 +50,31 @@ public class ContextExtractor {
         Set<String> visited = new HashSet<>();
         visited.add(AstUtils.createMethodId(targetMethod));
 
-        // Start recursive analysis
-        extractRecursive(targetMethod, targetMethod, result, visited);
+        // shallow = !verbose: in shallow mode, stop recursing after the first level
+        extractRecursive(targetMethod, targetMethod, result, visited, !verbose);
 
         return result;
     }
 
     /**
-     * Recursively traverses method calls to find all related user code.
-     * External libraries are automatically excluded as they lack source code definitions.
+     * Traverses method calls to collect related user code.
+     * External libraries are automatically excluded as they lack source code
+     * definitions.
+     *
+     * @param shallow if true, stops after the first level of calls (no further
+     *                recursion).
+     *                if false, recursively follows all dependencies.
      */
     private void extractRecursive(MethodDeclaration rootTarget,
-        MethodDeclaration currentMethod,
-        ContextResult result,
-        Set<String> visited) {
+            MethodDeclaration currentMethod,
+            ContextResult result,
+            Set<String> visited,
+            boolean shallow) {
 
         List<MethodDeclaration> dependencies = dependencyResolver.resolveMethods(currentMethod);
 
         ClassOrInterfaceDeclaration rootClass = rootTarget.findAncestor(ClassOrInterfaceDeclaration.class)
-            .orElse(null);
+                .orElse(null);
 
         for (MethodDeclaration dep : dependencies) {
             String depId = AstUtils.createMethodId(dep);
@@ -69,7 +87,7 @@ public class ContextExtractor {
             visited.add(depId);
 
             ClassOrInterfaceDeclaration depClass = dep.findAncestor(ClassOrInterfaceDeclaration.class)
-                .orElse(null);
+                    .orElse(null);
 
             // Categorize into Internal (same class) vs External (different class)
             if (rootClass != null && rootClass.equals(depClass)) {
@@ -78,8 +96,10 @@ public class ContextExtractor {
                 result.addExternalMethod(dep);
             }
 
-            // Continue recursion to find deeper dependencies
-            extractRecursive(rootTarget, dep, result, visited);
+            // In shallow mode, do not recurse further beyond the first level
+            if (!shallow) {
+                extractRecursive(rootTarget, dep, result, visited, shallow);
+            }
         }
     }
 

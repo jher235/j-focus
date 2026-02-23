@@ -19,12 +19,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
-@Command(
-    name = "jfocus",
-    mixinStandardHelpOptions = true,
-    version = "jfocus 1.0.0",
-    description = "Analyzes Java code context for LLM prompting."
-)
+@Command(name = "jfocus", mixinStandardHelpOptions = true, version = "jfocus 1.0.0", description = "Analyzes Java code context for LLM prompting.")
 public class JFocusCli implements Callable<Integer> {
 
     private final Scanner scanner = new Scanner(System.in);
@@ -96,7 +91,7 @@ public class JFocusCli implements Callable<Integer> {
 
             // 4. Extract & Export
             ContextExtractor contextExtractor = new ContextExtractor(projectParser);
-            ContextResult contextResult = contextExtractor.extractContext(targetMethod);
+            ContextResult contextResult = contextExtractor.extractContext(targetMethod, verbose);
 
             MarkdownExporter.ExportConfig config = new MarkdownExporter.ExportConfig(verbose);
             MarkdownExporter exporter = new MarkdownExporter(config);

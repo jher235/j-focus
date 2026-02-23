@@ -77,9 +77,8 @@ public class MarkdownExporter {
             sb.append("Signatures and JavaDocs are provided to maintain focus.\n\n");
 
             for (MethodDeclaration method : result.getExternalMethods()) {
-                // Include JavaDoc if present (toText() strips tags, toString() keeps them)
-                method.getJavadoc().ifPresent(javadoc ->
-                    sb.append(javadoc.toString()).append("\n"));
+                // Include JavaDoc if present as clean text
+                method.getJavadoc().ifPresent(javadoc -> sb.append(javadoc.toText()).append("\n"));
 
                 // Include Signature only
                 String signature = method.getDeclarationAsString(true, true, true) + ";";
