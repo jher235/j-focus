@@ -24,21 +24,25 @@ public class ContextExtractor {
     }
 
     /**
-     * Extracts the full context for the given target method recursively.
+     * Extracts the shallow context for the given target method (direct calls only).
+     * Equivalent to {@code extractContext(targetMethod, false)}.
      *
      * @param targetMethod The method to analyze
      * @return Categorized context (target + internal + external + fields)
      */
-    // Backward-compatible default: non-verbose (shallow)
     public ContextResult extractContext(MethodDeclaration targetMethod) {
         return extractContext(targetMethod, false);
     }
 
     /**
-     * @param verbose if true, recursively traverses internal methods to collect
-     *                their external calls as well (deep mode).
-     *                if false, only collects direct (1-depth) calls of the target
-     *                method (shallow mode).
+     * Extracts the context for the given target method.
+     *
+     * @param targetMethod The method to analyze
+     * @param verbose      if true, recursively traverses all dependencies (deep
+     *                     mode);
+     *                     if false, only collects direct (1-depth) calls (shallow
+     *                     mode).
+     * @return Categorized context (target + internal + external + fields)
      */
     public ContextResult extractContext(MethodDeclaration targetMethod, boolean verbose) {
         ContextResult result = new ContextResult(targetMethod);
@@ -50,8 +54,8 @@ public class ContextExtractor {
         Set<String> visited = new HashSet<>();
         visited.add(AstUtils.createMethodId(targetMethod));
 
-        // shallow = !verbose: in shallow mode, stop recursing after the first level
-        extractRecursive(targetMethod, targetMethod, result, visited, !verbose);
+        // Start recursive analysis based on verbose flag
+        extractRecursive(targetMethod, targetMethod, result, visited, verbose);
 
         return result;
     }
@@ -61,15 +65,15 @@ public class ContextExtractor {
      * External libraries are automatically excluded as they lack source code
      * definitions.
      *
-     * @param shallow if true, stops after the first level of calls (no further
+     * @param verbose if false, stops after the first level of calls (no further
      *                recursion).
-     *                if false, recursively follows all dependencies.
+     *                if true, recursively follows all dependencies.
      */
     private void extractRecursive(MethodDeclaration rootTarget,
             MethodDeclaration currentMethod,
             ContextResult result,
             Set<String> visited,
-            boolean shallow) {
+            boolean verbose) {
 
         List<MethodDeclaration> dependencies = dependencyResolver.resolveMethods(currentMethod);
 
@@ -96,9 +100,9 @@ public class ContextExtractor {
                 result.addExternalMethod(dep);
             }
 
-            // In shallow mode, do not recurse further beyond the first level
-            if (!shallow) {
-                extractRecursive(rootTarget, dep, result, visited, shallow);
+            // In verbose mode, recurse further to capture deeper dependencies
+            if (verbose) {
+                extractRecursive(rootTarget, dep, result, visited, verbose);
             }
         }
     }
