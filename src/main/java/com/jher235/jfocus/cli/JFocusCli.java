@@ -31,6 +31,8 @@ public class JFocusCli implements Callable<Integer> {
     private boolean verbose;
     @Option(names = { "-c", "--copy" }, description = "Copy to clipboard instead of stdout")
     private boolean copyToClipboard;
+    @Option(names = { "-l", "--list" }, description = "List all available methods without interactive prompt")
+    private boolean listMode;
 
     public static void main(String[] args) {
         int exitCode = new CommandLine(new JFocusCli()).execute(args);
@@ -64,6 +66,11 @@ public class JFocusCli implements Callable<Integer> {
             String foundPath = cu.getStorage().map(s -> s.getPath().toString()).orElse("Unknown");
             System.err.println("Found File: " + foundPath);
 
+            if (listMode) {
+                printMethodList(cu);
+                return 0;
+            }
+
             // 3. Handle Method Selection
             MethodDeclaration targetMethod;
             if (methodName == null) {
@@ -77,6 +84,18 @@ public class JFocusCli implements Callable<Integer> {
                     return 1;
                 }
                 if (methods.size() > 1) {
+                    boolean isInteractive = System.console() != null;
+                    if (!isInteractive) {
+                        System.err.println("[Error] Multiple overloads found for method '" + methodName + "'.");
+                        System.err.println(
+                                "In non-interactive mode, you MUST specify the exact signature wrapped in quotes.");
+                        System.err.println("\nAvailable signatures:");
+                        for (MethodDeclaration m : methods) {
+                            System.err.println("- \"" + m.getDeclarationAsString(false, false, false) + "\"");
+                        }
+                        System.err.println("\nExiting. (Exit code 1)");
+                        return 1;
+                    }
                     System.err.println("Multiple overloads found. Please choose: ");
                     targetMethod = selectMethodInteractive(methods);
                 } else {
@@ -194,6 +213,21 @@ public class JFocusCli implements Callable<Integer> {
         } catch (Exception e) {
             System.err.println("Copy failed. Printing result instead.");
             System.out.println(content);
+        }
+    }
+
+    private void printMethodList(CompilationUnit cu) {
+        List<MethodDeclaration> allMethods = cu.findAll(MethodDeclaration.class);
+
+        if (allMethods.isEmpty()) {
+            System.err.println("No methods found in this file.");
+            return;
+        }
+
+        System.out.println("Available Methods:");
+        for (MethodDeclaration m : allMethods) {
+            String params = m.getParameters().toString().replace("[", "(").replace("]", ")");
+            System.out.println("- " + m.getNameAsString() + params);
         }
     }
 }
