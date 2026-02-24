@@ -256,7 +256,7 @@ jfocus
 ### CLI Options
 
 ```bash
-Usage: jfocus [-cvhV] [fileName] [methodName]
+Usage: jfocus [-clvhV] [fileName] [methodName]
 ```
 
 | Option | Description | Example |
@@ -264,6 +264,7 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
 | `[fileName]` | Java filename to analyze (extension optional) | `UserController` |
 | `[methodName]` | Method name to analyze | `login` |
 | `-c`, `--copy` | **Copies result to clipboard** instead of printing to terminal. | `jfocus -c` |
+| `-l`, `--list` | **Lists available methods** without interactive prompt and cleanly exits. | `jfocus UserController -l` |
 | `-v`, `--verbose` | Includes source code of **Directly Referenced** methods. (Excludes deep recursive search) | `jfocus -v` |
 | `-h`, `--help` | Show help message. | |
 | `-V`, `--version` | Show version information. | |
@@ -369,6 +370,8 @@ Now ask the agent naturally:
 > "Analyze `PaymentService.process()` method in this project and suggest refactoring."
 
 The agent will automatically run `jfocus`, grasp the context, and provide an accurate response.
+
+> **Note on Overloaded Methods:** If a method requires specifying parameters to resolve an overload (e.g. `add(int, E)`), be sure to configure the agent to wrap the exact signature in quotes (e.g., `jfocus src/my/pkg/MyClass.java "void add(int index, E element)"`) to prevent shell syntax errors.
 
 ---
 

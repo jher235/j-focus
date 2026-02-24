@@ -10,20 +10,21 @@ public class MethodExtractor {
     /**
      * Finds all methods matching the specified name (case-insensitive).
      *
-     * @param cu The parsed CompilationUnit.
+     * @param cu         The parsed CompilationUnit.
      * @param methodName The name of the method to find.
      * @return A list of matching MethodDeclarations.
      */
     public List<MethodDeclaration> extractMethods(CompilationUnit cu, String methodName) {
         return cu.findAll(MethodDeclaration.class).stream()
-            .filter(method -> method.getNameAsString().equalsIgnoreCase(methodName))
-            .toList();
+                .filter(method -> method.getNameAsString().equalsIgnoreCase(methodName) ||
+                        method.getDeclarationAsString(false, false, true).equals(methodName))
+                .toList();
     }
 
     /**
      * Extracts the source code of the found methods into a single string.
      *
-     * @param cu The parsed CompilationUnit.
+     * @param cu         The parsed CompilationUnit.
      * @param methodName The name of the method to extract.
      * @return An Optional containing the combined source code of the methods.
      */
