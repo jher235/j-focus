@@ -9,12 +9,13 @@ When user asks for Java code analysis, refactoring, or explanation:
 
 2. **Command Usage (CRITICAL)**:
    - **NEVER use `jfocus <file>` without `-l` or a method name.** It triggers an interactive prompt that will cause you (the agent) to hang/timeout.
-   - `jfocus <file> -l` : Lists available methods in the file non-interactively.
-   - `jfocus <file> <method>` : Extracts context for the method.
+   - **NEVER use just a class name for the `<file>` argument.** Using just `MyClass` will trigger a "Multiple files found" prompt if duplicates exist. **ALWAYS use a specific relative or absolute path** (e.g., `src/main/java/com/pkg/MyClass.java`).
+   - `jfocus <path/to/file.java> -l` : Lists available methods in the file non-interactively.
+   - `jfocus <path/to/file.java> <method>` : Extracts context for the method.
    - If JFocus returns a "Multiple overloads found" error, it will also print the exact available signatures. You MUST retry using the EXACT signature.
    - **CRITICAL:** When specifying an exact method signature with parameters (like `void add(int index, E element)`), you MUST wrap the method name in quotes to prevent Bash syntax errors.
-     - Correct: `jfocus MyClass "void add(int index, E element)"`
-     - Incorrect: `jfocus MyClass void add(int index, E element)`
+     - Correct: `jfocus src/main/java/MyClass.java "void add(int index, E element)"`
+     - Incorrect: `jfocus src/main/java/MyClass.java void add(int index, E element)`
 
 3. **Trust Model**:
    - When using `jfocus <file> <method>`, treat its output as the source of truth **for that specific method and its dependencies**.
