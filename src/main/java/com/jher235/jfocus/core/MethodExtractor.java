@@ -17,8 +17,7 @@ public class MethodExtractor {
     public List<MethodDeclaration> extractMethods(CompilationUnit cu, String methodName) {
         return cu.findAll(MethodDeclaration.class).stream()
                 .filter(method -> method.getNameAsString().equalsIgnoreCase(methodName) ||
-                        method.getDeclarationAsString(false, false, false).equals(methodName) ||
-                        method.getSignature().asString().equals(methodName))
+                        method.getDeclarationAsString(false, false, true).equals(methodName))
                 .toList();
     }
 
