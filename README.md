@@ -371,7 +371,7 @@ Now ask the agent naturally:
 
 The agent will automatically run `jfocus`, grasp the context, and provide an accurate response.
 
-> **Note on Overloaded Methods:** If a method requires specifying parameters to resolve an overload (e.g. `add(int, E)`), be sure to configure the agent to wrap the exact signature in quotes (e.g., `jfocus MyClass "add(int index, E element)"`) to prevent shell syntax errors.
+> **Note on Overloaded Methods:** If a method requires specifying parameters to resolve an overload (e.g. `add(int, E)`), be sure to configure the agent to wrap the exact signature in quotes (e.g., `jfocus MyClass "void add(int index, E element)"`) to prevent shell syntax errors.
 
 ---
 

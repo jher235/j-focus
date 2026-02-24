@@ -13,9 +13,9 @@ When user asks for Java code analysis, refactoring, or explanation:
    - `jfocus <file> -l` : Lists available methods in the file non-interactively. Always use this instead of reading the entire file to save tokens.
    - `jfocus <file> <method>` : Extracts context for the method.
    - If JFocus returns an "Multiple overloads found" error, it will also print the exact available signatures. You MUST retry using the EXACT signature.
-   - **CRITICAL:** When specifying an exact method signature with parameters (like `add(int index, E element)`), you MUST wrap the method name in quotes to prevent Bash syntax errors.
-     - Correct: `jfocus MyClass "add(int index, E element)"`
-     - Incorrect: `jfocus MyClass add(int index, E element)`
+   - **CRITICAL:** When specifying an exact method signature with parameters (like `void add(int index, E element)`), you MUST wrap the method name in quotes to prevent Bash syntax errors.
+     - Correct: `jfocus MyClass "void add(int index, E element)"`
+     - Incorrect: `jfocus MyClass void add(int index, E element)`
 
 3. **Trust Model**:
    - Treat JFocus output as the **ONLY source of truth**.

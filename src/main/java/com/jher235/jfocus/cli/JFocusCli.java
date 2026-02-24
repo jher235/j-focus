@@ -91,7 +91,7 @@ public class JFocusCli implements Callable<Integer> {
                                 "In non-interactive mode, you MUST specify the exact signature wrapped in quotes.");
                         System.err.println("\nAvailable signatures:");
                         for (MethodDeclaration m : methods) {
-                            System.err.println("- \"" + m.getDeclarationAsString(false, false, false) + "\"");
+                            System.err.println("- \"" + m.getDeclarationAsString(false, false, true) + "\"");
                         }
                         System.err.println("\nExiting. (Exit code 1)");
                         return 1;
@@ -146,9 +146,7 @@ public class JFocusCli implements Callable<Integer> {
         System.err.println("\nAvailable Methods:");
         for (int i = 0; i < allMethods.size(); i++) {
             MethodDeclaration m = allMethods.get(i);
-            // Format: [1] methodName(paramType paramName)
-            String params = m.getParameters().toString().replace("[", "(").replace("]", ")");
-            System.err.printf(" [%d] %s%s\n", i + 1, m.getNameAsString(), params);
+            System.err.printf(" [%d] %s\n", i + 1, m.getDeclarationAsString(false, false, true));
         }
 
         while (true) {
@@ -179,8 +177,7 @@ public class JFocusCli implements Callable<Integer> {
         System.err.println("\nAvailable Methods:");
         for (int i = 0; i < methods.size(); i++) {
             MethodDeclaration m = methods.get(i);
-            String params = m.getParameters().toString().replace("[", "(").replace("]", ")");
-            System.err.printf(" [%d] %s%s\n", i + 1, m.getNameAsString(), params);
+            System.err.printf(" [%d] %s\n", i + 1, m.getDeclarationAsString(false, false, true));
         }
         while (true) {
             System.err.print("\nSelect method number (or 'q' to quit): ");
@@ -226,8 +223,7 @@ public class JFocusCli implements Callable<Integer> {
 
         System.out.println("Available Methods:");
         for (MethodDeclaration m : allMethods) {
-            String params = m.getParameters().toString().replace("[", "(").replace("]", ")");
-            System.out.println("- " + m.getNameAsString() + params);
+            System.out.println("- " + m.getDeclarationAsString(false, false, true));
         }
     }
 }
