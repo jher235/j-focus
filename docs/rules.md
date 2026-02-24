@@ -8,9 +8,14 @@ When user asks for Java code analysis, refactoring, or explanation:
    - ALWAYS use `jfocus <file> <method>` to extract the context first.
    - Use `-v` flag ONLY when you need to see dependency implementation details.
 
-2. **Command Usage**:
-   - `jfocus <file>` : Lists available methods in the file.
+2. **Command Usage (CRITICAL)**:
+   - **NEVER use `jfocus <file>` without `-l` or a method name.** It triggers an interactive prompt that will cause you (the agent) to hang/timeout.
+   - `jfocus <file> -l` : Lists available methods in the file non-interactively. Always use this instead of reading the entire file to save tokens.
    - `jfocus <file> <method>` : Extracts context for the method.
+   - If JFocus returns an "Multiple overloads found" error, it will also print the exact available signatures. You MUST retry using the EXACT signature.
+   - **CRITICAL:** When specifying an exact method signature with parameters (like `add(int index, E element)`), you MUST wrap the method name in quotes to prevent Bash syntax errors.
+     - Correct: `jfocus MyClass "add(int index, E element)"`
+     - Incorrect: `jfocus MyClass add(int index, E element)`
 
 3. **Trust Model**:
    - Treat JFocus output as the **ONLY source of truth**.

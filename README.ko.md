@@ -259,7 +259,7 @@ jfocus
 ### CLI 옵션 (Options)
 
 ```bash
-Usage: jfocus [-cvhV] [fileName] [methodName]
+Usage: jfocus [-clvhV] [fileName] [methodName]
 ```
 
 | 옵션 | 설명 | 예시 |
@@ -267,6 +267,7 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
 | `[fileName]` | 분석할 자바 파일명 (확장자 생략 가능) | `UserController` |
 | `[methodName]` | 분석할 메서드명 | `login` |
 | `-c`, `--copy` | 결과를 터미널에 출력하는 대신 **클립보드에 복사**합니다. | `jfocus -c` |
+| `-l`, `--list` | 대화형 프롬프트 없이 **사용 가능한 메서드 목록을 출력**하고 정상 종료합니다. | `jfocus UserController -l` |
 | `-v`, `--verbose` | **직접 참조된** 다른 메서드의 소스 코드를 포함합니다. (깊은 재귀 탐색 제외) | `jfocus -v` |
 | `-h`, `--help` | 도움말 메시지를 표시합니다. | |
 | `-V`, `--version` | 버전 정보를 표시합니다. | |
@@ -375,6 +376,8 @@ Usage: jfocus [-cvhV] [fileName] [methodName]
 > "이 프로젝트의 `PaymentService.process()` 메서드를 분석해서 리팩토링 제안해줘."
 
 에이전트는 자동으로 `jfocus`를 실행하여 문맥을 파악한 뒤, 정확한 답변을 제공할 것입니다.
+
+> **오버로딩 메서드 주의사항:** 오버로딩된 메서드를 분석할 때 매개변수를 지정해야 한다면 (예: `add(int, E)`), 셸 문법 오류를 방지하기 위해 에이전트가 정확한 시그니처를 **반드시 따옴표로 감싸도록** (예: `jfocus MyClass "add(int index, E element)"`) 규칙을 설정해 주세요.
 
 ---
 
